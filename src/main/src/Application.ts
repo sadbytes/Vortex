@@ -15,13 +15,10 @@ import type { IWindow } from "@vortex/shared/state";
 import { currentStatePath } from "@vortex/shared/state";
 import { app, crashReporter, dialog, ipcMain, protocol, shell } from "electron";
 import contextMenu from "electron-context-menu";
-import isAdmin from "is-admin";
 import * as _ from "lodash";
-import permissions from "permissions";
 import * as semver from "semver";
 import uuidpkg from "uuid";
 const { v4: uuidv4 } = uuidpkg;
-import winapi from "winapi-bindings";
 
 import { parseCommandline, updateStartupSettings } from "./cli";
 import { installDevelExtensions } from "./devel";
@@ -32,6 +29,7 @@ import { validateFiles } from "./fileValidation";
 import { getVortexPath, setVortexPath } from "./getVortexPath";
 import { log, setupLogging, changeLogPath } from "./logging";
 import MainWindow from "./MainWindow";
+import { getWinapi, isAdmin, permissions } from "./nativeModules";
 import SplashScreen from "./SplashScreen";
 import DuckDBSingleton from "./store/DuckDBSingleton";
 import LevelPersist, { DatabaseLocked, DatabaseOpenError } from "./store/LevelPersist";
@@ -45,6 +43,8 @@ import {
 import SubPersistor from "./store/SubPersistor";
 import { setTelemetryEnabled } from "./telemetry/state";
 import TrayIcon from "./TrayIcon";
+
+const winapi = getWinapi();
 
 /** test if the running version is a major downgrade (downgrading by a major or minor version,
 / everything except a patch) compared to what was running last */

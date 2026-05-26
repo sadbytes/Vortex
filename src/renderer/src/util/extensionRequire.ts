@@ -126,6 +126,12 @@ function extensionRequire(orig, getExtensions: () => IRegisteredExtension[]) {
         }
         return handlerMapReactAct[ext.name];
       }
+    } else if (id === "winapi-bindings") {
+      return require("./nativeModules/winapiBindings");
+    } else if (id === "permissions") {
+      return require("./nativeModules/permissions");
+    } else if (id === "wholocks") {
+      return require("./nativeModules/wholocks");
     }
     if (extensionPaths.find((iter) => this.filename.startsWith(iter.path)) !== undefined) {
       let res;

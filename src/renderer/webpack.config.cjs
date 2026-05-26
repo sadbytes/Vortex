@@ -37,6 +37,17 @@ const config = {
     resolve: {
         plugins: [new TsconfigPathsPlugin()],
         extensions: [".js", ".jsx", ".ts", ".tsx", ".json"],
+        alias: {
+            "winapi-bindings": path.resolve(
+                __dirname,
+                "src",
+                "util",
+                "nativeModules",
+                "winapiBindings.ts",
+            ),
+            permissions: path.resolve(__dirname, "src", "util", "nativeModules", "permissions.ts"),
+            wholocks: path.resolve(__dirname, "src", "util", "nativeModules", "wholocks.ts"),
+        },
     },
     // NOTE(erri120): disable polyfills for browser because nodeIntegration is enabled
     node: { __filename: false, __dirname: false },

@@ -29,11 +29,9 @@ import * as fs from "fs-extra";
 import { decode } from "iconv-lite";
 import JsonSocket from "json-socket";
 import * as _ from "lodash";
-import type * as permissionT from "permissions";
 import rimraf from "rimraf";
 import { generate as shortid } from "shortid";
 import * as tmp from "tmp";
-import type * as whoLocksT from "wholocks";
 
 import { ProcessCanceled, SelfCopyCheckError, UserCanceled } from "./CustomErrors";
 import { runElevated } from "./elevated";
@@ -42,10 +40,12 @@ import type { TFunction } from "./i18n";
 import lazyRequire from "./lazyRequire";
 import { log } from "./log";
 import { decodeSystemError } from "./nativeErrors";
+import type * as permissionT from "./nativeModules/permissions";
+import type * as whoLocksT from "./nativeModules/wholocks";
 import { restackErr, truthy } from "./util";
 
-const permission: typeof permissionT = lazyRequire(() => require("permissions"));
-const wholocks: typeof whoLocksT = lazyRequire(() => require("wholocks"));
+const permission: typeof permissionT = lazyRequire(() => require("./nativeModules/permissions"));
+const wholocks: typeof whoLocksT = lazyRequire(() => require("./nativeModules/wholocks"));
 
 const showMessageBox = async (
   options: Electron.MessageBoxOptions,

@@ -28,7 +28,6 @@ import { DEBUG_PORT, getErrorMessageOrDefault, HTTP_HEADER_SIZE } from "@vortex/
 import { app, dialog } from "electron";
 import i18next from "i18next";
 import * as sourceMapSupport from "source-map-support";
-import winapi from "winapi-bindings";
 
 // E2E test isolation: redirect userData and appData to temp directories so
 // parallel test workers share no data and don't conflict with the real install.
@@ -51,6 +50,7 @@ import { reportCrash, errorToReportableError, sendReportFile } from "./errorRepo
 import { getVortexPath } from "./getVortexPath";
 import { init as initIpcHandlers } from "./ipcHandlers";
 import { log } from "./logging";
+import { getWinapi } from "./nativeModules";
 import StylesheetCompiler from "./stylesheetCompiler";
 import { initTelemetryIpcHandler } from "./telemetry/ipcHandler";
 import { createMainTelemetryProvider } from "./telemetry/setup";
@@ -140,6 +140,7 @@ if (process.platform === "win32" && process.env.NODE_ENV !== "development") {
 }
 
 try {
+  const winapi = getWinapi();
   winapi?.SetProcessPreferredUILanguages?.(["en-US"]);
 } catch {
   // nop
