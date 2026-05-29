@@ -121,6 +121,9 @@ async function checkForErrors(api: types.IExtensionApi, pluginsObj: any) {
   );
 
   const dataFolder = discovery ? path.join(discovery, "data") : undefined;
+  if (dataFolder === undefined) {
+    return Bluebird.resolve(undefined);
+  }
 
   const normalize = (fileName: string) => {
     const noExt = path.basename(fileName, path.extname(fileName)).toLowerCase();
@@ -129,7 +132,16 @@ async function checkForErrors(api: types.IExtensionApi, pluginsObj: any) {
 
   const checkNotifId = "checking-archives-all";
   try {
-    const dataFiles = await fs.readdirAsync(dataFolder);
+    const dataFiles = await fs.readdirAsync(dataFolder).catch((err: NodeJS.ErrnoException) => {
+      if (err.code === "ENOENT") {
+        log("info", "skipping archive check, data folder doesn't exist", { dataFolder });
+        return undefined;
+      }
+      return Promise.reject(err);
+    });
+    if (dataFiles === undefined) {
+      return Bluebird.resolve(undefined);
+    }
     const dataArchives = dataFiles.filter((f) => [".ba2", ".bsa"].includes(path.extname(f)));
     const archivesToCheck: IDataArchive[] = archiveLoaders.reduce((accum, plugin) => {
       const arcs: IDataArchive[] = dataArchives

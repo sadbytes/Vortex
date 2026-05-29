@@ -20,6 +20,8 @@ interface IPluginMap {
 }
 
 const retryCount = 3;
+export const PLUGINS_FILE = "Plugins.txt";
+export const LOAD_ORDER_FILE = "loadorder.txt";
 
 /**
  * persistor syncing to and from the gamebryo plugins.txt and loadorder.txt
@@ -312,8 +314,8 @@ class PluginPersistor implements types.IPersistor {
       .filter((pluginId) => pluginId !== undefined)
       .map((pluginId) => this.mKnownPlugins[pluginId]);
 
-    const loadOrderFile = path.join(destPath, "loadorder.txt");
-    const pluginsFile = path.join(destPath, "plugins.txt");
+    const loadOrderFile = path.join(destPath, LOAD_ORDER_FILE);
+    const pluginsFile = path.join(destPath, PLUGINS_FILE);
     // this ensureDir should not be necessary
     return fs
       .ensureDirAsync(destPath)
@@ -433,7 +435,7 @@ class PluginPersistor implements types.IPersistor {
 
     let offset = 0;
 
-    const pluginsFile = path.join(this.mPluginPath, "plugins.txt");
+    const pluginsFile = path.join(this.mPluginPath, PLUGINS_FILE);
 
     const newPlugins: IPluginMap = {};
 
@@ -443,7 +445,7 @@ class PluginPersistor implements types.IPersistor {
     // for newer games, since all plugins are listed, we don't really need the loadorder.txt
     // at all
     if (this.mPluginFormat === "original") {
-      const loadOrderFile = path.join(this.mPluginPath, "loadorder.txt");
+      const loadOrderFile = path.join(this.mPluginPath, LOAD_ORDER_FILE);
       log("debug", "deserialize", {
         format: this.mPluginFormat,
         pluginsFile,
@@ -562,7 +564,7 @@ class PluginPersistor implements types.IPersistor {
       this.mWatch = fs.watch(this.mPluginPath, {}, (evt, fileName: string) => {
         if (
           !this.mSerializing &&
-          ["loadorder.txt", "plugins.txt"].includes(fileName) &&
+          [LOAD_ORDER_FILE, PLUGINS_FILE.toLowerCase()].includes(fileName.toLowerCase()) &&
           this.mPluginPath !== undefined
         ) {
           fs.statAsync(path.join(this.mPluginPath, fileName))

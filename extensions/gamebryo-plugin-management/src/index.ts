@@ -54,7 +54,7 @@ import {
 import { isMasterlistOutdated, masterlistExists, masterlistFilePath } from "./util/masterlist";
 import { markdownToBBCode } from "./util/mdtobb";
 import PluginHistory from "./util/PluginHistory";
-import PluginPersistor from "./util/PluginPersistor";
+import PluginPersistor, { LOAD_ORDER_FILE, PLUGINS_FILE } from "./util/PluginPersistor";
 import toPluginId from "./util/toPluginId";
 import UserlistPersistor from "./util/UserlistPersistor";
 import Connector from "./views/Connector";
@@ -486,10 +486,10 @@ function register(
 
   for (const gameId of supportedGames()) {
     context.registerProfileFile(gameId, () =>
-      Promise.resolve([path.join(pluginPath(gameId), "plugins.txt")]),
+      Promise.resolve([path.join(pluginPath(gameId), PLUGINS_FILE)]),
     );
     context.registerProfileFile(gameId, () =>
-      Promise.resolve([path.join(pluginPath(gameId), "loadorder.txt")]),
+      Promise.resolve([path.join(pluginPath(gameId), LOAD_ORDER_FILE)]),
     );
   }
 
@@ -941,7 +941,7 @@ function testPluginsLocked(gameMode: string): Promise<types.ITestResult> {
     return Promise.resolve(undefined);
   }
 
-  const filePath = path.join(pluginPath(gameMode), "plugins.txt");
+  const filePath = path.join(pluginPath(gameMode), PLUGINS_FILE);
   return new Promise<types.ITestResult>((resolve, reject) => {
     access(filePath, constants.W_OK, (err) => {
       if (err && err.code === "EPERM") {
