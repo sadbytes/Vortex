@@ -81,7 +81,7 @@ if (process.env.NODE_ENV === "development") {
 
 // Produce english error messages (windows only atm), otherwise they don't get
 // grouped correctly when reported through our feedback system
-import { SetProcessPreferredUILanguages } from "winapi-bindings";
+import { SetProcessPreferredUILanguages } from "./util/nativeModules/winapiBindings";
 if (SetProcessPreferredUILanguages !== undefined) {
   SetProcessPreferredUILanguages(["en-US"]);
 }

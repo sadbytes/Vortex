@@ -215,6 +215,13 @@ async function checkNetInstall(api: IExtensionApi, dotnetVersion: number): Promi
     stderr = result.stderr;
     exitCode = result.exitCode;
   } catch (e) {
+    if (process.platform === "linux" && (e as any)?.code === "ENOENT") {
+      log("info", "skipping .NET runtime check because dotnetprobe is not available", {
+        probeExecutable,
+      });
+      onDotNetSuccess();
+      return undefined!;
+    }
     onDotNetFailure(e);
     return undefined!;
   }

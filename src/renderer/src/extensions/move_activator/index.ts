@@ -5,7 +5,6 @@ import PromiseBB from "bluebird";
 import type { TFunction } from "i18next";
 import type { IEntry } from "turbowalk";
 import turbowalk from "turbowalk";
-import * as winapi from "winapi-bindings";
 
 import { setSettingsPage } from "../../actions/session";
 import type { IExtensionApi, IExtensionContext } from "../../types/IExtensionContext";
@@ -13,6 +12,7 @@ import type { IGame } from "../../types/IGame";
 import { UserCanceled } from "../../util/CustomErrors";
 import * as fs from "../../util/fs";
 import { log } from "../../util/log";
+import * as winapi from "../../util/nativeModules/winapiBindings";
 import type { IDiscoveryResult } from "../gamemode_management/types/IDiscoveryResult";
 import { getGame } from "../gamemode_management/util/getGame";
 import type { IDeployment } from "../mod_management/LinkingDeployment";

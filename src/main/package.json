@@ -8,8 +8,8 @@
   "type": "commonjs",
   "main": "build/main.cjs",
   "scripts": {
-    "start": "pnpm electron .",
-    "postinstall": "pnpm exec electron-rebuild",
+    "start": "node ./start.mjs",
+    "postinstall": "node ./rebuild-native.mjs",
     "build": "node ./build.mjs",
     "typecheck": "pnpm tsc",
     "lint": "pnpm eslint --quiet --concurrency auto .",
@@ -33,8 +33,17 @@
       },
       "build": {
         "dependsOn": [
+          "duckdb-extensions",
           "copy-assets",
           "copy-extensions",
+          {
+            "target": "build",
+            "projects": "@vortex/preload"
+          },
+          {
+            "target": "build",
+            "projects": "@vortex/renderer"
+          },
           "^build"
         ],
         "cache": true,
@@ -110,6 +119,23 @@
           "{projectRoot}/build/LICENSE.md"
         ]
       },
+      "duckdb-extensions": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "pnpm tsx scripts/download-duckdb-extensions.ts",
+          "cwd": "{workspaceRoot}"
+        },
+        "cache": true,
+        "inputs": [
+          "default",
+          "{workspaceRoot}/scripts/download-duckdb-extensions.ts",
+          "{workspaceRoot}/scripts/duckdb-extensions.json",
+          "{projectRoot}/package.json"
+        ],
+        "outputs": [
+          "{projectRoot}/build/duckdb-extensions/"
+        ]
+      },
       "sbom": {
         "executor": "nx:run-script",
         "options": {
@@ -155,6 +181,7 @@
     "./nsis/",
     "./electron-builder.config.json",
     "./prepare-dist-package.mjs",
+    "./rebuild-native.mjs",
     "./sign.cjs"
   ],
   "dependencies": {

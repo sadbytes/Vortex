@@ -7,7 +7,6 @@ import * as _ from "lodash";
 import Zip from "node-7z";
 import type * as Redux from "redux";
 import { generate as shortid } from "shortid";
-import winapi from "winapi-bindings";
 
 import ReduxProp from "../../ReduxProp";
 import type { IExtensionApi, IExtensionContext } from "../../types/IExtensionContext";
@@ -21,6 +20,7 @@ import * as fs from "../../util/fs";
 import type { Normalize } from "../../util/getNormalizeFunc";
 import getNormalizeFunc from "../../util/getNormalizeFunc";
 import { log } from "../../util/log";
+import winapi from "../../util/nativeModules/winapiBindings";
 import * as selectors from "../../util/selectors";
 import { knownGames } from "../../util/selectors";
 import { getSafe } from "../../util/storeHelper";

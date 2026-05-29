@@ -690,7 +690,7 @@ catalogs:
       specifier: 4.17.23
       version: 4.17.23
     loot:
-      specifier: git+https://github.com/Nexus-Mods/node-loot#7b6028fb2caeb3a2af6a0c3d68630c033cc01e8d
+      specifier: git+https://github.com/sadbytes/node-loot#master
       version: 6.2.2
     lru-cache:
       specifier: 11.2.7
@@ -1868,7 +1868,7 @@ importers:
     optionalDependencies:
       loot:
         specifier: 'catalog:'
-        version: https://codeload.github.com/Nexus-Mods/node-loot/tar.gz/7b6028fb2caeb3a2af6a0c3d68630c033cc01e8d
+        version: https://codeload.github.com/sadbytes/node-loot/tar.gz/259456196913f0de820847580e6ef1e5fcf19282
 
   extensions/gamebryo-savegame-management:
     dependencies:
@@ -10418,8 +10418,8 @@ packages:
     resolution: {integrity: sha512-lyuxPGr/Wfhrlem2CL/UcnUc1zcqKAImBDzukY7Y5F/yQiNdko6+fRLevlw1HgMySw7f611UIY408EtxRSoK3Q==}
     hasBin: true
 
-  loot@https://codeload.github.com/Nexus-Mods/node-loot/tar.gz/7b6028fb2caeb3a2af6a0c3d68630c033cc01e8d:
-    resolution: {gitHosted: true, integrity: sha512-/bqsW+y5n7JJNUiclZpvIFxT4DWVa7PXnQLHpiWQZvQ4FB1zW1XbC8brJTh6SAebh9E8MyUEnst/jQZhJ1hwtA==, tarball: https://codeload.github.com/Nexus-Mods/node-loot/tar.gz/7b6028fb2caeb3a2af6a0c3d68630c033cc01e8d}
+  loot@https://codeload.github.com/sadbytes/node-loot/tar.gz/259456196913f0de820847580e6ef1e5fcf19282:
+    resolution: {gitHosted: true, integrity: sha512-xHLOu4HNNcb+gcsVxuTsIcpO/obeQfj6K7SED/MVyemVYE3h9NQ5a2ABktpVPwhdxL2y0qfwLKhjesaLsCkoWA==, tarball: https://codeload.github.com/sadbytes/node-loot/tar.gz/259456196913f0de820847580e6ef1e5fcf19282}
     version: 6.2.2
 
   lowercase-keys@3.0.0:
@@ -18655,7 +18655,7 @@ snapshots:
     dependencies:
       js-tokens: 4.0.0
 
-  loot@https://codeload.github.com/Nexus-Mods/node-loot/tar.gz/7b6028fb2caeb3a2af6a0c3d68630c033cc01e8d:
+  loot@https://codeload.github.com/sadbytes/node-loot/tar.gz/259456196913f0de820847580e6ef1e5fcf19282:
     dependencies:
       autogypi: 0.2.2
       lodash: 4.17.23

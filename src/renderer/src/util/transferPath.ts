@@ -5,7 +5,6 @@ import { getErrorCode, isErrorWithSystemCode, unknownToError } from "@vortex/sha
 import PromiseBB from "bluebird";
 import type { IEntry } from "turbowalk";
 import turbowalk from "turbowalk";
-import * as winapi from "winapi-bindings";
 
 import { DOWNLOADS_DIR_TAG } from "../extensions/download_management/util/downloadDirectory";
 import { STAGING_DIR_TAG } from "../extensions/mod_management/stagingDirectory";
@@ -21,6 +20,7 @@ import * as fs from "./fs";
 import type { Normalize } from "./getNormalizeFunc";
 import getNormalizeFunc from "./getNormalizeFunc";
 import { log } from "./log";
+import * as winapi from "./nativeModules/winapiBindings";
 import { isChildPath } from "./util";
 
 const MIN_DISK_SPACE_OFFSET = 512 * 1024 * 1024;

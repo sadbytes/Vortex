@@ -3,9 +3,9 @@ import * as path from "path";
 
 import { getErrorCode, getErrorMessageOrDefault, unknownToError } from "@vortex/shared";
 import * as tmp from "tmp";
-import * as winapi from "winapi-bindings";
 
 import { log } from "../logging";
+import * as winapi from "./nativeModules/winapiBindings";
 import { getRealNodeModulePaths } from "./webpack-hacks";
 
 declare const __non_webpack_require__: NodeJS.Require;

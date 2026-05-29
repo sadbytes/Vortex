@@ -26,6 +26,7 @@ allowBuilds:
   node: true
   nx: false
   protobufjs: true
+  turbowalk: true
   unrs-resolver: true
   winapi-bindings: true
   xxhash-addon: true
@@ -194,7 +195,7 @@ catalog:
   limiter: 3.0.0
   lint-staged: 17.0.5
   lodash: 4.17.23
-  loot: git+https://github.com/Nexus-Mods/node-loot#7b6028fb2caeb3a2af6a0c3d68630c033cc01e8d
+  loot: git+https://github.com/sadbytes/node-loot#master
   lru-cache: 11.2.7
   markdown-ast: 0.2.1
   memoize-one: 5.2.1

@@ -1,11 +1,11 @@
 import type { TFunction } from "i18next";
 import * as React from "react";
-import * as winapi from "winapi-bindings";
 
 import { setSettingsPage } from "../../actions/session";
 import Icon from "../../controls/Icon";
 import Spinner from "../../controls/Spinner";
 import type { IExtensionApi, ToDoType } from "../../types/IExtensionContext";
+import * as winapi from "../../util/nativeModules/winapiBindings";
 import * as selectors from "../../util/selectors";
 import { setProfilesVisible } from "../settings_interface/actions/interface";
 import type { IToDo } from "./IToDo";

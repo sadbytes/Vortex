@@ -4,7 +4,6 @@ import * as path from "path";
 import { getErrorMessageOrDefault } from "@vortex/shared";
 import PromiseBB from "bluebird";
 import { parse } from "simple-vdf";
-import * as winapi from "winapi-bindings";
 
 import type { ICustomExecutionInfo, IExecInfo, IGameStore, IGameStoreEntry } from "../types/api";
 import type { IExtensionApi } from "../types/IExtensionContext";
@@ -14,6 +13,7 @@ import getVortexPath from "./getVortexPath";
 import { getProtonInfo, buildProtonEnvironment, buildProtonCommand } from "./linux/proton";
 import { findLinuxSteamPath } from "./linux/steamPaths";
 import { log } from "./log";
+import * as winapi from "./nativeModules/winapiBindings";
 import opn from "./opn";
 import { getSafeCI } from "./storeHelper";
 

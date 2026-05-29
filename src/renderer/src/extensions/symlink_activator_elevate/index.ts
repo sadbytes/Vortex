@@ -13,7 +13,6 @@ import type { TFunction } from "i18next";
 import JsonSocket from "json-socket";
 import * as semver from "semver";
 import { generate as shortid } from "shortid";
-import * as winapi from "winapi-bindings";
 
 import { clearUIBlocker, setUIBlocker } from "../../actions";
 import { log } from "../../logging";
@@ -26,6 +25,7 @@ import * as fs from "../../util/fs";
 import type { Normalize } from "../../util/getNormalizeFunc";
 import getVortexPath from "../../util/getVortexPath";
 import makeReactive from "../../util/makeReactive";
+import * as winapi from "../../util/nativeModules/winapiBindings";
 import { activeGameId, gameName } from "../../util/selectors";
 import { getSafe } from "../../util/storeHelper";
 import { getGame } from "../gamemode_management/util/getGame";

@@ -1,4 +1,4 @@
-import { GetNativeArch } from "winapi-bindings";
+import { GetNativeArch } from "./nativeModules/winapiBindings";
 
 export const getCPUArch = () => {
   try {

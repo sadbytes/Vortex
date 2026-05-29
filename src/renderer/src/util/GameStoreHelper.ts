@@ -1,7 +1,6 @@
 import * as path from "path";
 
 import Bluebird from "bluebird";
-import * as winapi from "winapi-bindings";
 
 import { getGameStores } from "../extensions/gamemode_management/util/getGame";
 import { makeExeId } from "../reducers/session";
@@ -13,6 +12,7 @@ import { ProcessCanceled, UserCanceled } from "./CustomErrors";
 import * as fs from "./fs";
 import getNormalizeFunc from "./getNormalizeFunc";
 import { log } from "./log";
+import * as winapi from "./nativeModules/winapiBindings";
 import { toBlue } from "./util";
 
 export const defaultPriority = 100;
