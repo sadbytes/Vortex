@@ -9,7 +9,7 @@
   "main": "build/main.cjs",
   "scripts": {
     "start": "node ./start.mjs",
-    "postinstall": "node ./rebuild-native.mjs",
+    "postinstall": "node ./postinstall.mjs",
     "build": "node ./build.mjs",
     "typecheck": "pnpm tsc",
     "lint": "pnpm eslint --quiet --concurrency auto .",
@@ -88,7 +88,11 @@
         },
         "dependsOn": [
           {
-            "target": "build",
+            "target": "sass",
+            "projects": "@vortex/stylesheets"
+          },
+          {
+            "target": "tailwind",
             "projects": "@vortex/stylesheets"
           },
           {
@@ -104,15 +108,16 @@
             "dependentTasksOutputFiles": "**/dist/**"
           },
           "{projectRoot}/copy-assets.mjs",
-          "{workspaceRoot}/src/stylesheets/**/*.scss",
           "{workspaceRoot}/src/renderer/src/index.html",
           "{workspaceRoot}/src/renderer/src/splash.html",
-          "{workspaceRoot}/src/queries/**/*",
-          "{workspaceRoot}/assets/**/*",
+          "{workspaceRoot}/src/queries/",
+          "{workspaceRoot}/assets/",
+          "{workspaceRoot}/locales/",
           "{workspaceRoot}/LICENSE.md"
         ],
         "outputs": [
           "{projectRoot}/build/assets/",
+          "{projectRoot}/build/locales/",
           "{projectRoot}/build/queries/",
           "{projectRoot}/build/index.html",
           "{projectRoot}/build/splash.html",
@@ -180,6 +185,7 @@
     "./build",
     "./nsis/",
     "./electron-builder.config.json",
+    "./postinstall.mjs",
     "./prepare-dist-package.mjs",
     "./rebuild-native.mjs",
     "./sign.cjs"
