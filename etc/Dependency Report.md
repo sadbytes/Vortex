@@ -15,7 +15,7 @@ This is a list of all modules leaked by Vortex to extensions. Any module listed 
 | @msgpack/msgpack | 2.8.0 |
 | @nexusmods/adaptor-api | link:../../packages/adaptor-api |
 | @nexusmods/fomod-installer-ipc | 0.13.1 |
-| @nexusmods/fomod-installer-native | 0.13.1 |
+| @nexusmods/fomod-installer-native | 0.13.2 |
 | @nexusmods/nexus-api | 1.6.2 |
 | @opentelemetry/api | 1.9.1 |
 | @opentelemetry/context-async-hooks | 2.6.1 |
@@ -113,7 +113,7 @@ This is a list of all modules leaked by Vortex to extensions. Any module listed 
 | tailwindcss | 4.3.0 |
 | tmp | 0.1.0 |
 | tough-cookie | 6.0.1 |
-| turbowalk | 3.1.1 |
+| turbowalk | link:../../packages/turbowalk |
 | universal-analytics | 0.4.23 |
 | uuid | 3.4.0 |
 | vortex-parse-ini | 0.4.0 |

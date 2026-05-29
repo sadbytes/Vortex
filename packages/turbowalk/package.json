@@ -1,0 +1,24 @@
+{
+  "$schema": "https://www.schemastore.org/package.json",
+  "name": "turbowalk",
+  "version": "3.1.1",
+  "description": "Platform-agnostic, fast-glob-backed drop-in replacement for node-turbowalk",
+  "private": true,
+  "type": "commonjs",
+  "main": "./index.js",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "dependencies": {
+    "bluebird": "catalog:",
+    "fast-glob": "catalog:"
+  },
+  "devDependencies": {
+    "@types/bluebird": "catalog:"
+  }
+}

@@ -26,7 +26,6 @@ allowBuilds:
   node: true
   nx: false
   protobufjs: true
-  turbowalk: true
   unrs-resolver: true
   winapi-bindings: true
   xxhash-addon: true
@@ -168,6 +167,7 @@ catalog:
   eslint-plugin-better-tailwindcss: 4.5.0
   eslint-plugin-import: 2.32.0
   eslint-plugin-perfectionist: 5.9.0
+  fast-glob: 3.3.3
   feedparser: 2.3.0
   font-scanner: 0.2.1
   fork-ts-checker-webpack-plugin: 9.1.0
@@ -263,7 +263,6 @@ catalog:
   tsconfig-paths-webpack-plugin: 4.2.0
   tsdown: 0.22.0
   tsx: 4.22.3
-  turbowalk: git+https://github.com/Nexus-Mods/node-turbowalk#3502f6ffc3f9eb55fe1c9c097b4e4772edce0c0f
   typed-binary: 4.3.3
   typescript: 6.0.3
   typescript-eslint: 8.59.4

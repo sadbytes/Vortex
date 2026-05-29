@@ -31,7 +31,7 @@
     "redux": "catalog:",
     "redux-act": "catalog:",
     "redux-thunk": "catalog:",
-    "turbowalk": "catalog:",
+    "turbowalk": "workspace:*",
     "@nexusmods/vortex-api": "workspace:*",
     "vortex-parse-ini": "catalog:"
   },

@@ -15,7 +15,7 @@
     "bluebird": "catalog:",
     "copyfiles": "catalog:",
     "redux": "catalog:",
-    "turbowalk": "catalog:",
+    "turbowalk": "workspace:*",
     "typescript": "catalog:",
     "@nexusmods/vortex-api": "workspace:*"
   },
