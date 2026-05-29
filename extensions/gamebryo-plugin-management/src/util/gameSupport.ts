@@ -314,6 +314,7 @@ export function syncGameSupport(gameId: string, gameSupportData: IGameSupport): 
 
 let discoveryForGame: (gameId: string) => types.IDiscoveryResult = () => undefined;
 let getApi: () => types.IExtensionApi = () => undefined;
+
 export function initGameSupport(api: types.IExtensionApi): Promise<void> {
   discoveryForGame = (gameId: string) => selectors.discoveryByGame(api.store.getState(), gameId);
   getApi = () => api;
@@ -323,6 +324,7 @@ export function initGameSupport(api: types.IExtensionApi): Promise<void> {
   return Promise.resolve()
     .then(() =>
       Promise.all([
+        util.initGameLocalAppDataBase(api),
         applyNativePlugins(api, "skyrimse", "Skyrim.ccc"),
         applyNativePlugins(api, "fallout4", "Fallout4.ccc"),
         applyNativePlugins(api, "starfield", "Starfield.ccc"),
@@ -353,10 +355,7 @@ export function initGameSupport(api: types.IExtensionApi): Promise<void> {
 
 export function appDataPath(gameMode: string): string {
   const dataPath = gameSupport.get(gameMode, "appDataPath");
-
-  return process.env.LOCALAPPDATA !== undefined
-    ? path.join(process.env.LOCALAPPDATA, dataPath)
-    : path.resolve(util.getVortexPath("appData"), "..", "Local", dataPath);
+  return util.resolveGameLocalAppDataPath(gameMode, dataPath);
 }
 
 export function gameDataPath(gameMode: string): string {

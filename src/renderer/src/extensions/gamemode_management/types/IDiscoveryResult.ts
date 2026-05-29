@@ -33,4 +33,6 @@ export interface IDiscoveryResult {
   extensionPath?: string;
   mergeMods?: boolean;
   shell?: boolean;
+  // absolute path to the Wine prefix root for this game (Linux only)
+  winePrefixPath?: string;
 }

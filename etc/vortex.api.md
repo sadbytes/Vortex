@@ -273,6 +273,7 @@ declare namespace actions {
         setGameHidden,
         setGameSearchPaths,
         setPickerLayout,
+        setWinePrefixPath,
         setSortManaged,
         setSortUnmanaged,
         setProfile,
@@ -2072,6 +2073,8 @@ interface IDiscoveryResult {
     tools?: {
         [id: string]: IDiscoveredTool;
     };
+    // (undocumented)
+    winePrefixPath?: string;
 }
 
 // @public
@@ -2547,6 +2550,8 @@ interface IGameStoreEntry {
     // (undocumented)
     appid: string;
     // (undocumented)
+    compatDataPath?: string;
+    // (undocumented)
     gamePath: string;
     // (undocumented)
     gameStoreId: string | undefined;
@@ -2558,6 +2563,12 @@ interface IGameStoreEntry {
     name: string;
     // (undocumented)
     priority?: number;
+    // (undocumented)
+    protonPath?: string;
+    // (undocumented)
+    usesProton?: boolean;
+    // (undocumented)
+    winePrefixPath?: string;
 }
 
 // @public (undocumented)
@@ -3153,6 +3164,12 @@ urls: string[];
 modInfo: IDictionary;
 games: string[];
 }, {}>;
+
+// @public (undocumented)
+const initGameDocumentsBase: (api: IExtensionApi) => Promise<void>;
+
+// @public (undocumented)
+const initGameLocalAppDataBase: (api: IExtensionApi) => Promise<void>;
 
 // @public
 interface INotification {
@@ -5007,6 +5024,32 @@ function resolveCategoryName(category: string | number, state: IState): string;
 // @public
 function resolveCategoryPath(category: string | number, state: IState): string;
 
+// @public (undocumented)
+const resolveGameDocumentsBase: (gameId: string) => string;
+
+// @public (undocumented)
+const resolveGameLocalAppDataBase: (gameId: string) => string;
+
+// @public (undocumented)
+function resolveGameLocalAppDataPath(gameId: string, relativePath: string): string;
+
+// @public (undocumented)
+function resolveGameMyGamesPath(gameId: string, gamePath: string): string;
+
+// Warning: (ae-forgotten-export) The symbol "ResolvedPathCache" needs to be exported by the entry point api.d.ts
+//
+// @public
+function resolvePathCaseInsensitive(targetPath: string, cache?: ResolvedPathCache): Promise<string>;
+
+// @public
+function resolvePathCaseInsensitiveSync(targetPath: string, cache?: ResolvedPathCache): string;
+
+// @public (undocumented)
+function resolveWineDocuments(prefixPath: string): Promise<string>;
+
+// @public (undocumented)
+function resolveWineLocalAppData(prefixPath: string): Promise<string>;
+
 // @public
 type Revertability = "yes" | "never" | "invalid";
 
@@ -5692,6 +5735,12 @@ const setWindowPosition: reduxAct.ComplexActionCreator1<any, any, {}>;
 
 // @public
 const setWindowSize: reduxAct.ComplexActionCreator1<any, any, {}>;
+
+// @public (undocumented)
+const setWinePrefixPath: ComplexActionCreator2<string, string, {
+gameId: string;
+prefixPath: string;
+}, {}>;
 
 // @public (undocumented)
 const setZoomFactor: reduxAct.ComplexActionCreator1<any, any, {}>;
@@ -6405,8 +6454,18 @@ declare namespace util {
         removeMods,
         modName as renderModName,
         renderModReference,
+        resolvePathCaseInsensitive,
+        resolvePathCaseInsensitiveSync,
         resolveCategoryName,
         resolveCategoryPath,
+        initGameDocumentsBase,
+        initGameLocalAppDataBase,
+        resolveGameDocumentsBase,
+        resolveGameLocalAppDataBase,
+        resolveGameLocalAppDataPath,
+        resolveGameMyGamesPath,
+        resolveWineDocuments,
+        resolveWineLocalAppData,
         runElevated,
         runThreaded,
         sanitizeCSSId,

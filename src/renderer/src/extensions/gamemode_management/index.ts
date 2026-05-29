@@ -23,6 +23,7 @@ import type {
 } from "../../types/IExtensionContext";
 import type { IGame } from "../../types/IGame";
 import type { IGameStore } from "../../types/IGameStore";
+import type { IGameStoreEntry } from "../../types/IGameStoreEntry";
 import type { NotificationDismiss } from "../../types/INotification";
 import type { IProfile, IRunningTool, IState } from "../../types/IState";
 import type { IEditChoice, ITableAttribute } from "../../types/ITableAttribute";
@@ -30,6 +31,10 @@ import { COMPANY_ID, NEXUSMODS_EXT_ID } from "../../util/constants";
 import { DataInvalid, ProcessCanceled, SetupError, UserCanceled } from "../../util/CustomErrors";
 import * as fs from "../../util/fs";
 import GameStoreHelper from "../../util/GameStoreHelper";
+import getNormalizeFunc from "../../util/getNormalizeFunc";
+import { initGameDocumentsBase } from "../../util/linux/gameDocuments";
+import { initGameLocalAppDataBase } from "../../util/linux/gameLocalAppData";
+import { getWinePrefixPathForGameStoreEntry } from "../../util/linux/steamGameStoreEntry";
 import local from "../../util/local";
 import { showError } from "../../util/message";
 import opn from "../../util/opn";
@@ -46,6 +51,7 @@ import {
   clearDiscoveredGame,
   setGamePath,
   setGameSearchPaths,
+  setWinePrefixPath,
 } from "./actions/settings";
 import type GameModeManager from "./GameModeManager";
 import { type IGameStub } from "./GameModeManager";
@@ -57,6 +63,7 @@ import { currentGame, currentGameDiscovery, discoveryByGame, gameById } from "./
 import type { IDiscoveryResult } from "./types/IDiscoveryResult";
 import type { IGameStored } from "./types/IGameStored";
 import type { IModType } from "./types/IModType";
+import { verifyGamePathMarkers } from "./util/gamePathValidation";
 import getDriveList from "./util/getDriveList";
 import { getGame, getGameStore, getGameStores } from "./util/getGame";
 import { getModType, getModTypeExtensions, registerModType } from "./util/modTypeExtensions";
@@ -182,9 +189,7 @@ function refreshGameInfo(store: Redux.Store<IState>, gameId: string): PromiseBB<
 }
 
 function verifyGamePath(game: IGame, gamePath: string): PromiseBB<void> {
-  return PromiseBB.map(game.requiredFiles || [], (file) =>
-    PromiseBB.resolve(fsExtra.stat(path.join(gamePath, file))),
-  )
+  return verifyGamePathMarkers(game.id, gamePath, game.requiredFiles || [])
     .then(() => undefined)
     .catch((err) => {
       // if the error is anything other than "the file doesn't exist" we assume
@@ -228,49 +233,151 @@ function findGamePath(
     );
 }
 
+// Confirms which game store a manually selected path belongs to. On Linux we
+// trust the auto-detection (no dialog); on other platforms the user gets to
+// correct it, since stores can have store-specific folder structures.
+function confirmGameStore(
+  api: IExtensionApi,
+  storeId: string | undefined,
+): PromiseBB<string | undefined> {
+  if (process.platform === "linux") {
+    return PromiseBB.resolve(storeId);
+  }
+
+  const gameStores = getGameStores();
+  const detectedStore = gameStores.find((store) => store.id === storeId);
+  return api
+    .showDialog(
+      "question",
+      "Choose a Game Store",
+      {
+        bbcode: api.translate(
+          'The currently identified game store for your selected game directory is: "{{gameStore}}".[br][/br][br][/br]' +
+            "If this is not the correct game store, please choose below. (Games can have game store specific folder structures)[br][/br][br][/br]",
+          { replace: { gameStore: detectedStore?.name || "Unknown" } },
+        ),
+        choices: gameStores
+          .map((store) => ({
+            id: store.id,
+            text: store.name,
+            value: store.id === storeId,
+          }))
+          .concat({
+            id: "other",
+            text: "Other",
+            value: storeId === undefined,
+          }),
+      },
+      [{ label: "Select" }],
+    )
+    .then((res) => {
+      const selected = Object.keys(res.input).find((iter) => res.input[iter]);
+      if (selected === undefined) {
+        return PromiseBB.reject(new UserCanceled());
+      }
+      return selected === "other" ? storeId : selected;
+    });
+}
+
 function manualGameStoreSelection(
   api: IExtensionApi,
   correctedGamePath: string,
-): PromiseBB<{ store: string; corrected: string }> {
-  const gameStores = getGameStores();
-  return GameStoreHelper.identifyStore(correctedGamePath).then((storeId) => {
-    const detectedStore = gameStores.find((store) => store.id === storeId);
-    return api
-      .showDialog(
-        "question",
-        "Choose a Game Store",
-        {
-          bbcode: api.translate(
-            'The currently identified game store for your selected game directory is: "{{gameStore}}".[br][/br][br][/br]' +
-              "If this is not the correct game store, please choose below. (Games can have game store specific folder structures)[br][/br][br][/br]",
-            { replace: { gameStore: detectedStore?.name || "Unknown" } },
-          ),
-          choices: gameStores
-            .map((store) => ({
-              id: store.id,
-              text: store.name,
-              value: store.id === storeId,
-            }))
-            .concat({
-              id: "other",
-              text: "Other",
-              value: storeId === undefined,
-            }),
-        },
-        [{ label: "Select" }],
-      )
-      .then((res) => {
-        const selected = Object.keys(res.input).find((iter) => res.input[iter]);
-        if (selected === undefined) {
-          return PromiseBB.reject(new UserCanceled());
+): PromiseBB<{ store: string; corrected: string; winePrefixPath?: string }> {
+  return GameStoreHelper.identifyStore(correctedGamePath)
+    .then(
+      (storeId) => confirmGameStore(api, storeId),
+      (err) => {
+        // Linux has no confirmation dialog to recover through, so a failed
+        // store identification must not block adding the game - continue with
+        // an unknown store. On other platforms the failure propagates as before.
+        if (process.platform !== "linux") {
+          return PromiseBB.reject(err);
         }
-        if (selected === "other") {
-          return { store: storeId, corrected: correctedGamePath };
-        } else {
-          return { store: selected, corrected: correctedGamePath };
-        }
+        log("debug", "failed to identify game store for manually selected path", {
+          path: correctedGamePath,
+          error: getErrorMessageOrDefault(err),
+        });
+        return undefined;
+      },
+    )
+    .then((store) =>
+      findWinePrefixPathForGamePath(correctedGamePath, store).then((winePrefixPath) => ({
+        store,
+        corrected: correctedGamePath,
+        winePrefixPath,
+      })),
+    );
+}
+
+function findWinePrefixPathForGamePath(
+  gamePath: string,
+  storeId: string | undefined,
+): PromiseBB<string | undefined> {
+  if (process.platform !== "linux" || storeId !== "steam") {
+    return PromiseBB.resolve(undefined);
+  }
+
+  let store: IGameStore | undefined;
+  try {
+    store = GameStoreHelper.getGameStore(storeId);
+  } catch (err) {
+    return PromiseBB.resolve(undefined);
+  }
+
+  if (store === undefined) {
+    return PromiseBB.resolve(undefined);
+  }
+
+  return PromiseBB.resolve(getNormalizeFunc(gamePath))
+    .then((normalize) =>
+      store.allGames().then((entries: IGameStoreEntry[]) => {
+        const entry = entries.find((iter) => normalize(iter.gamePath) === normalize(gamePath));
+        return entry !== undefined ? getWinePrefixPathForGameStoreEntry(entry) : undefined;
+      }),
+    )
+    .catch((err) => {
+      log("debug", "failed to resolve Wine prefix for Steam game", {
+        path: gamePath,
+        error: getErrorMessageOrDefault(err),
       });
-  });
+      return undefined;
+    });
+}
+
+function promptWinePrefixPath(
+  api: IExtensionApi,
+  currentPrefixPath: string | undefined,
+): PromiseBB<string | undefined> {
+  if (process.platform === "win32" || currentPrefixPath !== undefined) {
+    return PromiseBB.resolve(currentPrefixPath);
+  }
+
+  return api
+    .showDialog(
+      "question",
+      "Wine Prefix Path",
+      {
+        text: api.translate(
+          "If this game runs through Wine, Proton, Heroic, Lutris, or Bottles, set its Wine prefix path now. You can skip this and configure it later in Game Settings.",
+        ),
+        input: [
+          {
+            id: "winePrefixPath",
+            label: "Wine Prefix Path",
+            placeholder: "/path/to/prefix",
+            value: "",
+          },
+        ],
+      },
+      [{ label: "Skip" }, { label: "Save" }],
+    )
+    .then((res) => {
+      if (res.action !== "Save") {
+        return undefined;
+      }
+      const prefixPath = res.input?.winePrefixPath?.trim();
+      return prefixPath || undefined;
+    });
 }
 
 function browseGameLocation(api: IExtensionApi, gameId: string): PromiseBB<void> {
@@ -320,7 +427,16 @@ function browseGameLocation(api: IExtensionApi, gameId: string): PromiseBB<void>
       if (result !== undefined) {
         findGamePath(game, result, 0, searchDepth(game.requiredFiles || []))
           .then((corrected: string) => manualGameStoreSelection(api, corrected))
-          .then(({ corrected, store }) => {
+          .then(({ corrected, store, winePrefixPath }) =>
+            promptWinePrefixPath(api, winePrefixPath ?? discovery?.winePrefixPath).then(
+              (selectedWinePrefixPath) => ({
+                corrected,
+                store,
+                winePrefixPath: selectedWinePrefixPath,
+              }),
+            ),
+          )
+          .then(({ corrected, store, winePrefixPath }) => {
             let executable = game.executable(corrected);
             if (executable === game.executable()) {
               executable = undefined;
@@ -339,8 +455,12 @@ function browseGameLocation(api: IExtensionApi, gameId: string): PromiseBB<void>
                   executable,
                   pathSetManually: true,
                   store,
+                  winePrefixPath,
                 }),
               );
+            }
+            if (winePrefixPath !== undefined && discovery?.winePrefixPath === undefined) {
+              api.store.dispatch(setWinePrefixPath(game.id, winePrefixPath));
             }
 
             // discovery should still point to the old data at this point.
@@ -493,9 +613,7 @@ function removeDisappearedGames(
     if (requiredFiles === undefined) {
       return PromiseBB.resolve();
     }
-    return PromiseBB.map(requiredFiles, (file) =>
-      fsExtra.stat(path.join(discovered[gameId].path, file)),
-    )
+    return verifyGamePathMarkers(gameId, discovered[gameId].path, requiredFiles)
       .then(() => undefined)
       .catch((err) => {
         if (err.code === "ENOENT") {
@@ -708,6 +826,16 @@ function init(context: IExtensionContext): boolean {
 
   context.registerTableAttribute("mods", genModTypeAttribute(context.api));
 
+  context.registerSettings(
+    "Game",
+    LazyComponent(() => require("./views/WinePrefixSettings")),
+    undefined,
+    () =>
+      process.platform !== "win32" &&
+      currentGameDiscovery(context.api.getState())?.path !== undefined,
+    50,
+  );
+
   context.registerGameStore = ((gameStore: IGameStore) => {
     if (gameStore === undefined) {
       context.api.showErrorNotification("Invalid game store extension not loaded", undefined, {
@@ -870,6 +998,23 @@ function init(context: IExtensionContext): boolean {
     gameIsDiscovered,
   );
   context.registerAction(
+    "game-discovered-buttons",
+    105,
+    "open-ext",
+    {},
+    context.api.translate("Open Game Folder"),
+    openGameFolder,
+  );
+  context.registerAction(
+    "game-undiscovered-buttons",
+    105,
+    "open-ext",
+    {},
+    context.api.translate("Open Game Folder"),
+    openGameFolder,
+    gameIsDiscovered,
+  );
+  context.registerAction(
     "game-managed-buttons",
     110,
     "open-ext",
@@ -939,6 +1084,8 @@ function init(context: IExtensionContext): boolean {
     const GameModeManagerImpl: typeof GameModeManager = require("./GameModeManager").default;
 
     context.api.ext["awaitProfileSwitch"] = () => awaitProfileSwitch(context.api);
+    initGameDocumentsBase(context.api).then(() => null);
+    initGameLocalAppDataBase(context.api).then(() => null);
 
     $.gameModeManager = new GameModeManagerImpl(
       context.api,

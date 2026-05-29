@@ -4,7 +4,6 @@ import { getErrorCode, getErrorMessageOrDefault, unknownToError } from "@vortex/
 import Bluebird from "bluebird";
 import * as fsExtra from "fs-extra";
 import turbowalk from "turbowalk";
-import * as winapi from "winapi-bindings";
 
 import type { IDiscoveredTool } from "../../../types/IDiscoveredTool";
 import type { IExtensionApi } from "../../../types/IExtensionContext";
@@ -19,7 +18,9 @@ import GameStoreHelper from "../../../util/GameStoreHelper";
 import type { Normalize } from "../../../util/getNormalizeFunc";
 import getNormalizeFunc from "../../../util/getNormalizeFunc";
 import getVortexPath from "../../../util/getVortexPath";
+import { getWinePrefixPathForGameStoreEntry } from "../../../util/linux/steamGameStoreEntry";
 import { log } from "../../../util/log";
+import * as winapi from "../../../util/nativeModules/winapiBindings";
 import StarterInfo from "../../../util/StarterInfo";
 import { getSafe } from "../../../util/storeHelper";
 import { truthy } from "../../../util/util";
@@ -182,6 +183,7 @@ function queryByArgs(
 
 function queryByCB(game: IGame): Bluebird<Partial<IGameStoreEntry>> {
   let gamePath: string | Bluebird<string | IGameStoreEntry>;
+  let winePrefixPath: string | undefined;
 
   try {
     gamePath = game.queryPath();
@@ -219,6 +221,7 @@ function queryByCB(game: IGame): Bluebird<Partial<IGameStoreEntry>> {
         return Bluebird.reject(new GameEntryNotFound(game.id, "unknown"));
       } else {
         store = resolvedInfo.gameStoreId;
+        winePrefixPath = getWinePrefixPathForGameStoreEntry(resolvedInfo);
         return resolvedInfo.gamePath;
       }
     })
@@ -227,7 +230,7 @@ function queryByCB(game: IGame): Bluebird<Partial<IGameStoreEntry>> {
         ? Bluebird.resolve(undefined)
         : fs
             .statAsync(resolvedPath)
-            .then(() => ({ gamePath: resolvedPath, gameStoreId: store }))
+            .then(() => ({ gamePath: resolvedPath, gameStoreId: store, winePrefixPath }))
             .catch((err) => {
               if (err.code === "ENOENT") {
                 log("warn", "rejecting game discovery, directory doesn't exist", resolvedPath);
@@ -242,6 +245,7 @@ function handleDiscoveredGame(
   game: IGame,
   resolvedPath: string,
   store: string,
+  winePrefixPath: string | undefined,
   discoveredGames: { [id: string]: IDiscoveryResult },
   onDiscoveredGame: DiscoveredCB,
   onDiscoveredTool: DiscoveredToolCB,
@@ -255,6 +259,7 @@ function handleDiscoveredGame(
     path: resolvedPath,
     executable: exe !== game.executable() ? exe : undefined,
     store,
+    winePrefixPath,
   };
   onDiscoveredGame(game.id, disco);
   return getNormalizeFunc(resolvedPath)
@@ -309,6 +314,7 @@ export function quickDiscovery(
                 game,
                 result.gamePath,
                 result.gameStoreId,
+                getWinePrefixPathForGameStoreEntry(result),
                 discoveredGames,
                 onDiscoveredGame,
                 onDiscoveredTool,
@@ -326,6 +332,7 @@ export function quickDiscovery(
               game,
               result.gamePath,
               result.gameStoreId,
+              result.winePrefixPath,
               discoveredGames,
               onDiscoveredGame,
               onDiscoveredTool,

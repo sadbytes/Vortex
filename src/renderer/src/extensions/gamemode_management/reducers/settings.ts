@@ -22,6 +22,13 @@ export const settingsReducer: IReducerSpec<ISettingsGameMode> = {
         const { path: _path, ...rest } = result;
         result = rest;
       }
+      if (
+        getSafe(state, [...gamePath, "winePrefixPath"], undefined) !== undefined &&
+        result.winePrefixPath !== undefined
+      ) {
+        const { winePrefixPath: _winePrefixPath, ...rest } = result;
+        result = rest;
+      }
       const res = merge(state, gamePath, result);
       const merged = getSafe(res, gamePath, undefined);
       if (merged.executable === undefined) {
@@ -103,6 +110,10 @@ export const settingsReducer: IReducerSpec<ISettingsGameMode> = {
       state.discovered[payload.gameId] === undefined
         ? state
         : merge(state, ["discovered", payload.gameId], payload.parameters),
+    [actions.setWinePrefixPath as any]: (state, payload) =>
+      payload.prefixPath === undefined
+        ? deleteOrNop(state, ["discovered", payload.gameId, "winePrefixPath"])
+        : setSafe(state, ["discovered", payload.gameId, "winePrefixPath"], payload.prefixPath),
     [actions.setGameHidden as any]: (state, payload) =>
       setSafe(state, ["discovered", payload.gameId, "hidden"], payload.hidden),
     [actions.setGameSearchPaths as any]: (state, payload) =>

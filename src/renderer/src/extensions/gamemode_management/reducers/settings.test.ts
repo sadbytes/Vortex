@@ -215,6 +215,29 @@ describe("addDiscoveredGame", () => {
     expect(result.discovered.gameId1.path).toBe("path2");
     expect(result.discovered.gameId2.path).toBe("path1");
   });
+
+  it("adds an automatically detected Wine prefix", () => {
+    const input = makeSettings({
+      gameId1: makeGame({ path: "path1" }),
+    });
+    const result = settingsReducer.reducers.ADD_DISCOVERED_GAME(input, {
+      id: "gameId1",
+      result: makeGame({ winePrefixPath: "/steam/compatdata/123/pfx" }),
+    });
+    expect(result.discovered.gameId1.winePrefixPath).toBe("/steam/compatdata/123/pfx");
+  });
+
+  it("does not overwrite an existing Wine prefix during auto-discovery", () => {
+    const input = makeSettings({
+      gameId1: makeGame({ path: "path1", winePrefixPath: "/custom/pfx" }),
+    });
+    const result = settingsReducer.reducers.ADD_DISCOVERED_GAME(input, {
+      id: "gameId1",
+      result: makeGame({ path: "path2", winePrefixPath: "/steam/compatdata/123/pfx" }),
+    });
+    expect(result.discovered.gameId1.path).toBe("path2");
+    expect(result.discovered.gameId1.winePrefixPath).toBe("/custom/pfx");
+  });
 });
 
 describe("addDiscoveredTool", () => {

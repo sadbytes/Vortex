@@ -12,6 +12,7 @@ import type { IExtensionApi } from "../../types/IExtensionContext";
 import type { DirectoryCleaningMode, IGame } from "../../types/IGame";
 import type { IState } from "../../types/IState";
 import { getGame, UserCanceled } from "../../util/api";
+import { resolvePathCaseInsensitive } from "../../util/caseInsensitivePath";
 import * as fs from "../../util/fs";
 import type { Normalize } from "../../util/getNormalizeFunc";
 import { activeGameId } from "../../util/selectors";
@@ -83,6 +84,7 @@ abstract class LinkingActivator implements IDeploymentMethod {
   private mQueue: Promise<void> = Promise.resolve();
   private mContext: IDeploymentContext;
   private mDirCache: Set<string>;
+  private mResolvedDirCache: Map<string, string>;
 
   constructor(
     id: string,
@@ -173,6 +175,7 @@ abstract class LinkingActivator implements IDeploymentMethod {
     let errorCount: number = 0;
 
     this.mDirCache = new Set<string>();
+    this.mResolvedDirCache = new Map<string, string>();
 
     // unlink all files that were removed or changed
     ({ added, removed, sourceChanged, contentChanged } = this.diffActivation(
@@ -341,6 +344,7 @@ abstract class LinkingActivator implements IDeploymentMethod {
         })
         .finally(() => {
           this.mDirCache = undefined;
+          this.mResolvedDirCache = undefined;
         })
     );
   }
@@ -473,9 +477,9 @@ abstract class LinkingActivator implements IDeploymentMethod {
   }
 
   public isDeployed(installPath: string, dataPath: string, file: IDeployedFile): Promise<boolean> {
-    const fullPath = path.join(dataPath, file.target || "", file.relPath);
+    const rawPath = path.join(dataPath, file.target || "", file.relPath);
 
-    return Promise.resolve(
+    return this.resolveOutputPath(rawPath).then((fullPath) =>
       fs
         .statAsync(fullPath)
         .then(() => true)
@@ -494,7 +498,7 @@ abstract class LinkingActivator implements IDeploymentMethod {
     return mapWithConcurrency(
       activation ?? [],
       (fileEntry) => {
-        const fileDataPath = (
+        const rawDataPath = (
           truthy(fileEntry.target)
             ? [dataPath, fileEntry.target, fileEntry.relPath]
             : [dataPath, fileEntry.relPath]
@@ -507,85 +511,72 @@ abstract class LinkingActivator implements IDeploymentMethod {
 
         let sourceStats: fs.Stats;
 
-        return Promise.resolve(this.stat(fileModPath))
-          .catch((err: unknown) => {
-            // can't stat source, probably the file was deleted.
-            // change: we no longer automatically assume the file is deleted because
-            // otherwise the dialog will offer the user to delete the file permanently
-            // which - if the user isn't careful - would break the mod.
-            // The problem is that we now likely can't determine if the link is intact so the
-            // entire process may fail but I assume that's still preferrable.
-            const code = getErrorCode(err);
-            if (["ENOENT", "ENOTFOUND"].includes(code)) {
-              sourceDeleted = true;
-            } else {
-              log("info", "source file can't be accessed", {
-                fileModPath,
-                error: getErrorMessageOrDefault(err),
-              });
-            }
-            return Promise.resolve(undefined);
-          })
-          .then((sourceStatsIn) => {
-            sourceStats = sourceStatsIn;
-            if (sourceStats !== undefined) {
-              sourceTime = sourceStats.mtime;
-            }
-            return this.statLink(fileDataPath);
-          })
-          .catch((err: unknown) => {
-            // can't stat destination, probably the file was deleted
-            const code = getErrorCode(err);
-            if (["ENOENT", "ENOTFOUND"].includes(code)) {
-              destDeleted = true;
-            } else {
-              log("info", "link can't be accessed", {
-                fileModPath,
-                error: getErrorMessageOrDefault(err),
-              });
-            }
-            return Promise.resolve(undefined);
-          })
-          .then((destStats) => {
-            if (destStats !== undefined) {
-              destTime = destStats.mtime;
-            }
-            return sourceDeleted || destDeleted
-              ? Promise.resolve(false)
-              : this.isLink(fileDataPath, fileModPath, destStats, sourceStats);
-          })
-          .then((isLink?: boolean) => {
-            if (sourceDeleted && !destDeleted && this.canRestore()) {
-              changes.push({
-                filePath: fileEntry.relPath,
-                source: fileEntry.source,
-                changeType: "srcdeleted",
-              });
-            } else if (destDeleted && !sourceDeleted) {
-              changes.push({
-                filePath: fileEntry.relPath,
-                source: fileEntry.source,
-                changeType: "deleted",
-              });
-            } else if (!sourceDeleted && !destDeleted && !isLink) {
-              changes.push({
-                filePath: fileEntry.relPath,
-                source: fileEntry.source,
-                sourceTime,
-                destTime,
-                changeType: "refchange",
-              });
-              /* TODO not registering these atm as we have no way to "undo" anyway
-          } else if (destTime.getTime() !== fileEntry.time) {
-            nonLinks.push({
-              filePath: fileEntry.relPath,
-              source: fileEntry.source,
-              changeType: 'valchange',
-            });
-          */
-            }
-            return Promise.resolve(undefined);
-          });
+        return this.resolveOutputPath(rawDataPath).then((fileDataPath) =>
+          Promise.resolve(this.stat(fileModPath))
+            .catch((err: unknown) => {
+              const code = getErrorCode(err);
+              if (["ENOENT", "ENOTFOUND"].includes(code)) {
+                sourceDeleted = true;
+              } else {
+                log("info", "source file can't be accessed", {
+                  fileModPath,
+                  error: getErrorMessageOrDefault(err),
+                });
+              }
+              return Promise.resolve(undefined);
+            })
+            .then((sourceStatsIn) => {
+              sourceStats = sourceStatsIn;
+              if (sourceStats !== undefined) {
+                sourceTime = sourceStats.mtime;
+              }
+              return this.statLink(fileDataPath);
+            })
+            .catch((err: unknown) => {
+              const code = getErrorCode(err);
+              if (["ENOENT", "ENOTFOUND"].includes(code)) {
+                destDeleted = true;
+              } else {
+                log("info", "link can't be accessed", {
+                  fileModPath,
+                  error: getErrorMessageOrDefault(err),
+                });
+              }
+              return Promise.resolve(undefined);
+            })
+            .then((destStats) => {
+              if (destStats !== undefined) {
+                destTime = destStats.mtime;
+              }
+              return sourceDeleted || destDeleted
+                ? Promise.resolve(false)
+                : this.isLink(fileDataPath, fileModPath, destStats, sourceStats);
+            })
+            .then((isLink?: boolean) => {
+              if (sourceDeleted && !destDeleted && this.canRestore()) {
+                changes.push({
+                  filePath: fileEntry.relPath,
+                  source: fileEntry.source,
+                  changeType: "srcdeleted",
+                });
+              } else if (destDeleted && !sourceDeleted) {
+                changes.push({
+                  filePath: fileEntry.relPath,
+                  source: fileEntry.source,
+                  changeType: "deleted",
+                });
+              } else if (!sourceDeleted && !destDeleted && !isLink) {
+                changes.push({
+                  filePath: fileEntry.relPath,
+                  source: fileEntry.source,
+                  sourceTime,
+                  destTime,
+                  changeType: "refchange",
+                });
+              }
+              return Promise.resolve(undefined);
+            }),
+        );
       },
       200,
     ).then(() => this.deduplicate(changes));
@@ -677,6 +668,24 @@ abstract class LinkingActivator implements IDeploymentMethod {
     ).then(() => didCreate);
   }
 
+  /**
+   * On Linux (case-sensitive FS), resolve the directory portion of an output
+   * path against what actually exists on disk so that e.g. a mod shipping
+   * "scripts/foo.pex" deploys into an existing "Scripts/" directory instead
+   * of creating a second "scripts/" directory.  No-op on Windows/macOS.
+   */
+  private resolveOutputPath(outputPath: string): Promise<string> {
+    if (process.platform !== "linux") {
+      return Promise.resolve(outputPath);
+    }
+    const dirPath = path.dirname(outputPath);
+    const fileName = path.basename(outputPath);
+
+    return resolvePathCaseInsensitive(dirPath, this.mResolvedDirCache).then((resolved) =>
+      path.join(resolved, fileName),
+    );
+  }
+
   private deduplicate(input: IFileChange[]): IFileChange[] {
     // since the change detection is an asynchronous process, it's possible (though extremely rare)
     // that the same file may show up with different change types. This can cause an error
@@ -711,7 +720,7 @@ abstract class LinkingActivator implements IDeploymentMethod {
     if (this.mContext.previousDeployment[key] === undefined) {
       return Promise.reject(new Error(`failed to remove "${key}"`));
     }
-    const outputPath = path.join(
+    const rawOutputPath = path.join(
       dataPath,
       this.mContext.previousDeployment[key].target || "",
       this.mContext.previousDeployment[key].relPath,
@@ -721,33 +730,26 @@ abstract class LinkingActivator implements IDeploymentMethod {
       this.mContext.previousDeployment[key].source,
       this.mContext.previousDeployment[key].relPath,
     );
-    return Promise.resolve(this.unlinkFile(outputPath, sourcePath))
-      .catch((err: unknown) =>
-        // duck-typing is unavoidable here: symlink_activator_elevate rejects
-        // with deserialized IPC objects that are not Error instances, so
-        // getErrorCode() (which requires instanceof Error) would miss the code.
-        (err as any)?.code !== "ENOENT"
-          ? // treat an ENOENT error for the unlink as if it was a success.
-            // The end result either way is the link doesn't exist now.
-            Promise.reject(err)
-          : Promise.resolve(),
+    return this.resolveOutputPath(rawOutputPath)
+      .then((outputPath) =>
+        Promise.resolve(this.unlinkFile(outputPath, sourcePath))
+          .catch((err: unknown) =>
+            (err as any)?.code !== "ENOENT" ? Promise.reject(err) : Promise.resolve(),
+          )
+          .then(() =>
+            restoreBackup
+              ? fs.renameAsync(outputPath + BACKUP_TAG, outputPath).catch(() => undefined)
+              : Promise.resolve(),
+          )
+          .then(() => {
+            delete this.mContext.previousDeployment[key];
+          }),
       )
-      .then(() =>
-        restoreBackup
-          ? fs.renameAsync(outputPath + BACKUP_TAG, outputPath).catch(() => undefined)
-          : Promise.resolve(),
-      )
-      .then(() => {
-        delete this.mContext.previousDeployment[key];
-      })
       .catch((err: unknown) => {
         log("warn", "failed to unlink", {
           path: this.mContext.previousDeployment[key].relPath,
           error: getErrorMessageOrDefault(err),
         });
-        // need to make sure the deployment manifest
-        // reflects the actual state, otherwise we may
-        // leave files orphaned
         this.mContext.newDeployment[key] = this.mContext.previousDeployment[key];
 
         return Promise.reject(err);
@@ -766,7 +768,7 @@ abstract class LinkingActivator implements IDeploymentMethod {
       this.mContext.newDeployment[key].source,
       this.mContext.newDeployment[key].relPath,
     ].join(path.sep);
-    const fullOutputPath = [
+    const rawOutputPath = [
       dataPath,
       this.mContext.newDeployment[key].target || null,
       this.mContext.newDeployment[key].relPath,
@@ -774,29 +776,26 @@ abstract class LinkingActivator implements IDeploymentMethod {
       .filter((i) => i !== null)
       .join(path.sep);
 
-    const backupProm: Promise<void> = replace
-      ? Promise.resolve()
-      : Promise.resolve(this.isLink(fullOutputPath, fullPath))
-          .then((link) =>
-            link
-              ? Promise.resolve(undefined) // don't re-create link that's already correct
-              : fs.renameAsync(fullOutputPath, fullOutputPath + BACKUP_TAG),
-          )
-          .catch((err: unknown) =>
-            getErrorCode(err) === "ENOENT"
-              ? // if the backup fails because there is nothing to backup, that's great,
-                // that's the most common outcome. Otherwise we failed to backup an existing
-                // file, so continuing could cause data loss
-                Promise.resolve(undefined)
-              : Promise.reject(err),
-          );
+    return this.resolveOutputPath(rawOutputPath).then((fullOutputPath) => {
+      const backupProm: Promise<void> = replace
+        ? Promise.resolve()
+        : Promise.resolve(this.isLink(fullOutputPath, fullPath))
+            .then((link) =>
+              link
+                ? Promise.resolve(undefined) // don't re-create link that's already correct
+                : fs.renameAsync(fullOutputPath, fullOutputPath + BACKUP_TAG),
+            )
+            .catch((err: unknown) =>
+              getErrorCode(err) === "ENOENT" ? Promise.resolve(undefined) : Promise.reject(err),
+            );
 
-    return backupProm
-      .then(() => this.linkFile(fullOutputPath, fullPath, dirTags))
-      .then(() => {
-        this.mContext.previousDeployment[key] = this.mContext.newDeployment[key];
-        return this.mContext.newDeployment[key];
-      });
+      return backupProm
+        .then(() => this.linkFile(fullOutputPath, fullPath, dirTags))
+        .then(() => {
+          this.mContext.previousDeployment[key] = this.mContext.newDeployment[key];
+          return this.mContext.newDeployment[key];
+        });
+    });
   }
 
   private diffActivation(before: IDeployment, after: IDeployment) {

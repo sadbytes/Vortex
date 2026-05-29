@@ -76,5 +76,10 @@ export const setPickerLayout = createAction(
   (layout: "list" | "small" | "large") => ({ layout }),
 );
 
+export const setWinePrefixPath = createAction(
+  "SET_WINE_PREFIX_PATH",
+  (gameId: string, prefixPath: string | undefined) => ({ gameId, prefixPath }),
+);
+
 export const setSortManaged = createAction("SET_SORT_MANAGED", (order: string) => order);
 export const setSortUnmanaged = createAction("SET_SORT_UNMANAGED", (order: string) => order);

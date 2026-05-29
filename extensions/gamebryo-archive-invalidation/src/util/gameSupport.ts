@@ -27,7 +27,7 @@ const gameSupport = util.makeOverlayableDictionary<string, IGameSupport>(
         );
       },
       targetAge: new Date(2008, 10, 1),
-      mygamesPath: "skyrim",
+      mygamesPath: "Skyrim",
       iniName: "Skyrim.ini",
       archiveListKey: "SResourceArchiveList",
       defaultArchives: [
@@ -51,8 +51,8 @@ const gameSupport = util.makeOverlayableDictionary<string, IGameSupport>(
         );
       },
       targetAge: new Date(2008, 10, 1),
-      mygamesPath: "enderal",
-      iniName: "enderal.ini",
+      mygamesPath: "Enderal",
+      iniName: "Enderal.ini",
       archiveListKey: "SResourceArchiveList",
       defaultArchives: [
         "Skyrim - Misc.bsa",
@@ -286,11 +286,7 @@ export function bsaVersion(gameId: string): number {
 }
 
 export function mygamesPath(gameMode: string): string {
-  return path.join(
-    util.getVortexPath("documents"),
-    "My Games",
-    gameSupport.get(gameMode, "mygamesPath"),
-  );
+  return util.resolveGameMyGamesPath(gameMode, gameSupport.get(gameMode, "mygamesPath"));
 }
 
 export function iniName(gameMode: string): string {

@@ -22,6 +22,7 @@ import Spinner from "../../../controls/Spinner";
 import { IconButton } from "../../../controls/TooltipControls";
 import ZoomableImage from "../../../controls/ZoomableImage";
 import type { IState } from "../../../types/api";
+import { resolvePathCaseInsensitiveSync } from "../../../util/caseInsensitivePath";
 import { pushSafe, removeValue } from "../../../util/storeHelper";
 import { truthy } from "../../../util/util";
 import type {
@@ -492,9 +493,14 @@ class InstallerDialog extends PureComponentEx<IProps, IDialogState> {
       return null;
     }
 
+    const normalizedImage = image.replace(/\\/g, "/");
+    const imagePath = resolvePathCaseInsensitiveSync(
+      path.join(installerInfo.dataPath, normalizedImage),
+    );
+
     return (
       <ZoomableImage
-        url={pathToFileURL(path.join(installerInfo.dataPath, image)).href}
+        url={pathToFileURL(imagePath).href}
         className="installer-image"
         overlayClass="installer-zoom"
         container={undefined}

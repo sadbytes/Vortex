@@ -91,6 +91,7 @@ import {
 } from "../extensions/mod_management/util/installerHelpers";
 import ReduxProp from "../ReduxProp";
 import { getReduxLog } from "../store/reduxLogger";
+import { resolvePathCaseInsensitive, resolvePathCaseInsensitiveSync } from "./caseInsensitivePath";
 import { copyFileAtomic, writeFileAtomic } from "./fsAtomic";
 import getNormalizeFunc, { makeNormalizingDict } from "./getNormalizeFunc";
 import getVortexPath from "./getVortexPath";
@@ -98,6 +99,17 @@ import github from "./github";
 import type { TFunction } from "./i18n";
 import { getCurrentLanguage } from "./i18n";
 import lazyRequire from "./lazyRequire";
+import {
+  initGameDocumentsBase,
+  resolveGameDocumentsBase,
+  resolveGameMyGamesPath,
+} from "./linux/gameDocuments";
+import {
+  initGameLocalAppDataBase,
+  resolveGameLocalAppDataBase,
+  resolveGameLocalAppDataPath,
+} from "./linux/gameLocalAppData";
+import { resolveWineDocuments, resolveWineLocalAppData } from "./linux/winePaths";
 import local from "./local";
 import makeReactive from "./makeReactive";
 import onceCB from "./onceCB";
@@ -244,8 +256,18 @@ export {
   removeMods,
   renderModName,
   renderModReference,
+  resolvePathCaseInsensitive,
+  resolvePathCaseInsensitiveSync,
   resolveCategoryName,
   resolveCategoryPath,
+  initGameDocumentsBase,
+  initGameLocalAppDataBase,
+  resolveGameDocumentsBase,
+  resolveGameLocalAppDataBase,
+  resolveGameLocalAppDataPath,
+  resolveGameMyGamesPath,
+  resolveWineDocuments,
+  resolveWineLocalAppData,
   runElevated,
   runThreaded,
   sanitizeCSSId,

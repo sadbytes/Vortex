@@ -69,7 +69,9 @@ class GameModeManager {
     this.mStore = null;
     this.mKnownGames = extensionGames;
     this.mGameStubs = gameStubs;
-    this.mKnownGameStores = [Steam, EpicGamesLauncher, ...gameStoreExtensions];
+    this.mKnownGameStores = [Steam, EpicGamesLauncher, ...gameStoreExtensions].filter(
+      (store): store is IGameStore => store != null,
+    );
     this.mActiveSearch = null;
     this.mOnGameModeActivated = onGameModeActivated;
   }

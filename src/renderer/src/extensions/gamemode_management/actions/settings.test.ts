@@ -54,6 +54,16 @@ describe("setGameParameters", () => {
   });
 });
 
+describe("setWinePrefixPath", () => {
+  it("creates the correct action", () => {
+    expect(actions.setWinePrefixPath("gameId1", "/wine/prefix")).toEqual({
+      error: false,
+      type: "SET_WINE_PREFIX_PATH",
+      payload: { gameId: "gameId1", prefixPath: "/wine/prefix" },
+    });
+  });
+});
+
 describe("addDiscoveredGame", () => {
   it("creates the correct action", () => {
     const result: IDiscoveryResult = {
