@@ -22,7 +22,6 @@
     "@types/react-select": "catalog:",
     "@types/redux": "catalog:",
     "@types/redux-thunk": "catalog:",
-    "bluebird": "catalog:",
     "copyfiles": "catalog:",
     "cytoscape": "catalog:",
     "cytoscape-cose-bilkent": "catalog:",

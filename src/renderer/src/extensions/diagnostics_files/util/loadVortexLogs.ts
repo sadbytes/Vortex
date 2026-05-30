@@ -1,12 +1,10 @@
 import * as path from "path";
 
-import PromiseBB from "bluebird";
-
+import { mapSeries } from "../../../util/asyncpromise";
 import * as fs from "../../../util/fs";
 import getVortexPath from "../../../util/getVortexPath";
 import type { LogLevel } from "../../../util/log";
 import type { ILog, ISession } from "../types/ISession";
-
 // New format: timestamp [LEVEL] [PROCESS] message
 const lineRE = /^(\S+) \[([A-Z]*)\] \[([A-Z]*)\] (.*)\r?/;
 // Legacy format: timestamp [LEVEL] message
@@ -44,14 +42,16 @@ function parseLine(line: string, idx: number): ILog {
   return undefined;
 }
 
-export function loadVortexLogs(): PromiseBB<ISession[]> {
+export function loadVortexLogs(): Promise<ISession[]> {
   const logPath = getVortexPath("userData");
 
-  return PromiseBB.resolve(fs.readdirAsync(logPath))
-    .filter((fileName: string) => fileName.match(/vortex[0-9]?\.log/) !== null)
+  return Promise.resolve(fs.readdirAsync(logPath))
+    .then((fileNames: string[]) =>
+      fileNames.filter((fileName: string) => fileName.match(/vortex[0-9]?\.log/) !== null),
+    )
     .then((logFileNames: string[]) => {
       logFileNames = logFileNames.sort((lhs: string, rhs: string) => rhs.localeCompare(lhs));
-      return PromiseBB.mapSeries(logFileNames, (logFileName: string) =>
+      return mapSeries(logFileNames, (logFileName: string) =>
         fs.readFileAsync(path.join(logPath, logFileName), "utf8"),
       );
     })
@@ -77,5 +77,5 @@ export function loadVortexLogs(): PromiseBB<ISession[]> {
         ) as ISession;
       });
     })
-    .filter((session: ISession) => session !== undefined);
+    .then((sessions: ISession[]) => sessions.filter((session: ISession) => session !== undefined));
 }

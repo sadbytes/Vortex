@@ -8,7 +8,6 @@ import {
   getErrorNativeCode,
   unknownToError,
 } from "@vortex/shared";
-import PromiseBB from "bluebird";
 import type { TFunction } from "i18next";
 import JsonSocket from "json-socket";
 import * as semver from "semver";
@@ -19,7 +18,9 @@ import { log } from "../../logging";
 import type { IExtensionApi, IExtensionContext } from "../../types/IExtensionContext";
 import type { IGame } from "../../types/IGame";
 import type { IState } from "../../types/IState";
+import { delay, only } from "../../util/asyncpromise";
 import { ProcessCanceled, UserCanceled } from "../../util/CustomErrors";
+import { TimeoutError } from "../../util/CustomErrors";
 import { runElevated } from "../../util/elevated";
 import * as fs from "../../util/fs";
 import type { Normalize } from "../../util/getNormalizeFunc";
@@ -28,6 +29,7 @@ import makeReactive from "../../util/makeReactive";
 import * as winapi from "../../util/nativeModules/winapiBindings";
 import { activeGameId, gameName } from "../../util/selectors";
 import { getSafe } from "../../util/storeHelper";
+import { timeout } from "../../util/util";
 import { getGame } from "../gamemode_management/util/getGame";
 import LinkingDeployment from "../mod_management/LinkingDeployment";
 import type {
@@ -186,7 +188,7 @@ class DeploymentMethod extends LinkingDeployment {
     );
   }
 
-  public userGate(): PromiseBB<void> {
+  public userGate(): Promise<void> {
     // In the past, we used to block the user from deploying/purging his mods
     //  until he would give us consent to elevate permissions to do so.
     // That is a redundant anti-pattern as the elevation UI itself will already inform the user
@@ -201,7 +203,7 @@ class DeploymentMethod extends LinkingDeployment {
     // I could add a Promise.race([this.waitForUser(), this.waitForElevation()]) to replace the mWaitForUser
     //  functor - but what's the point - if the user clicked deploy, he surely wants to elevate his instance
     //  as well. (And if not, he can always cancel the Windows API dialog!)
-    return PromiseBB.resolve();
+    return Promise.resolve();
   }
 
   public prepare(
@@ -226,9 +228,10 @@ class DeploymentMethod extends LinkingDeployment {
     this.mOpenRequests = {};
     return this.closeServer()
       .then(() => this.startElevated())
-      .tapCatch((err) => {
+      .catch((err) => {
         log("info", "elevated process failed", { error: getErrorMessageOrDefault(err) });
         this.context.onComplete();
+        throw err;
       })
       .then(() => super.finalize(gameId, dataPath, installationPath))
       .then((result) => this.stopElevated().then(() => result));
@@ -300,13 +303,13 @@ class DeploymentMethod extends LinkingDeployment {
       );
   }
 
-  protected unlinkFile(linkPath: string): PromiseBB<void> {
+  protected unlinkFile(linkPath: string): Promise<void> {
     return this.emitOperation("remove-link", {
       destination: linkPath,
     });
   }
 
-  protected purgeLinks(installPath: string, dataPath: string): PromiseBB<void> {
+  protected purgeLinks(installPath: string, dataPath: string): Promise<void> {
     let hadErrors = false;
     // purge by removing all symbolic links that point to a file inside
     // the install directory
@@ -314,16 +317,16 @@ class DeploymentMethod extends LinkingDeployment {
       .then(() =>
         walk(dataPath, (iterPath: string, stats: fs.Stats) => {
           if (!stats.isSymbolicLink()) {
-            return PromiseBB.resolve();
+            return Promise.resolve();
           }
           return fs
             .readlinkAsync(iterPath)
             .then((symlinkPath) =>
               path.relative(installPath, symlinkPath).startsWith("..")
-                ? PromiseBB.resolve()
+                ? Promise.resolve()
                 : this.emitOperation("remove-link", { destination: iterPath }),
             )
-            .catch((err) => {
+            .catch((err: any) => {
               if (err.code === "ENOENT") {
                 log("debug", "link already gone", {
                   iterPath,
@@ -344,14 +347,14 @@ class DeploymentMethod extends LinkingDeployment {
         if (hadErrors) {
           const err = new Error("Some files could not be purged, please check the log file");
           err["attachLogOnReport"] = true;
-          return PromiseBB.reject(err);
+          return Promise.reject(err);
         } else {
-          return PromiseBB.resolve();
+          return Promise.resolve();
         }
       });
   }
 
-  protected isLink(linkPath: string, sourcePath: string): PromiseBB<boolean> {
+  protected isLink(linkPath: string, sourcePath: string): Promise<boolean> {
     return (
       fs
         .readlinkAsync(linkPath)
@@ -367,11 +370,11 @@ class DeploymentMethod extends LinkingDeployment {
     return false;
   }
 
-  private closeServer(): PromiseBB<void> {
+  private closeServer(): Promise<void> {
     if (this.mIPCServer === undefined || this.mQuitTimer !== undefined) {
-      return PromiseBB.resolve();
+      return Promise.resolve();
     }
-    return new PromiseBB((resolve, reject) => {
+    return new Promise((resolve, reject) => {
       this.mIPCServer.close((err?: Error) => {
         // note: err may be undefined instead of null
         if (err) {
@@ -412,22 +415,24 @@ class DeploymentMethod extends LinkingDeployment {
   }
 
   private emitAsync(command: string, args: any, requestNum: number) {
-    return new PromiseBB<void>((resolve, reject) => {
+    return new Promise<void>((resolve, reject) => {
       this.emit(command, { ...args, num: requestNum });
       this.mOpenRequests[requestNum] = { resolve, reject };
     });
   }
 
-  private emitOperation(command: string, args: any, tries: number = 3): PromiseBB<void> {
+  private emitOperation(command: string, args: any, tries: number = 3): Promise<void> {
     const requestNum = this.mCounter++;
-    return this.emitAsync(command, args, requestNum)
-      .timeout(5000)
-      .catch(PromiseBB.TimeoutError, (err) => {
+    return timeout(this.emitAsync(command, args, requestNum), 5000, { throw: true }).catch(
+      (err) => {
+        if (!(err instanceof TimeoutError)) {
+          throw err;
+        }
         if (this.mOpenRequests[requestNum] === undefined) {
           // this makes no sense, why would the timeout expire if the request
           // was resolved?
           log("warn", "request timed out after being fulfilled?");
-          return PromiseBB.resolve();
+          return Promise.resolve();
         }
 
         delete this.mOpenRequests[requestNum];
@@ -435,18 +440,20 @@ class DeploymentMethod extends LinkingDeployment {
           log("debug", "retrying fs op", { command, args, tries });
           return this.emitOperation(command, args, tries - 1);
         } else {
-          return PromiseBB.reject(err);
+          return Promise.reject(err);
         }
-      });
+      },
+    );
   }
 
-  private startElevated(): PromiseBB<void> {
-    return this.startElevatedImpl().tapCatch(() => {
+  private startElevated(): Promise<void> {
+    return this.startElevatedImpl().catch((err) => {
       this.api.store.dispatch(clearUIBlocker("elevating"));
+      throw err;
     });
   }
 
-  private startElevatedImpl(): PromiseBB<void> {
+  private startElevatedImpl(): Promise<void> {
     this.mOpenRequests = {};
     this.mDone = null;
 
@@ -456,7 +463,7 @@ class DeploymentMethod extends LinkingDeployment {
     // can't use dynamic id for the task
     const ipcPath: string = useTask ? IPC_ID : `${IPC_ID}_${shortid()}`;
 
-    return new PromiseBB<void>((resolve, reject) => {
+    return new Promise<void>((resolve, reject) => {
       let elevating = false;
       const tStart = Date.now();
 
@@ -551,19 +558,21 @@ class DeploymentMethod extends LinkingDeployment {
       }
 
       const remoteProm = useTask
-        ? PromiseBB.resolve()
-        : PromiseBB.delay(0)
+        ? Promise.resolve()
+        : delay(0)
             .then(() => runElevated(ipcPath, remoteCode, {}))
-            .tap((tmpPath) => {
+            .then((tmpPath) => {
               this.mTmpFilePath = tmpPath;
               log("debug", "started elevated process");
+              return tmpPath;
             })
             .then(() => undefined)
-            .tapCatch(() => {
+            .catch((err) => {
               this.api.store.dispatch(clearUIBlocker("elevating"));
               elevating = false;
               log("error", "failed to run remote process");
               this.endIPC("starting remote process failed");
+              throw err;
             });
 
       if (useTask) {
@@ -598,10 +607,10 @@ class DeploymentMethod extends LinkingDeployment {
           //  for ERROR_CANCELLED, which in this case is raised if the user
           //  selects to deny elevation when prompted.
           //  https://docs.microsoft.com/en-us/windows/desktop/debug/system-error-codes--1000-1299-
-          .catch({ code: 5 }, () => reject(new UserCanceled()))
-          .catch({ systemCode: 1223 }, () => reject(new UserCanceled()))
+          .catch(only({ code: 5 }, () => reject(new UserCanceled())))
+          .catch(only({ systemCode: 1223 }, () => reject(new UserCanceled())))
           // Just in case this is still used somewhere - doesn't look like it though.
-          .catch({ errno: 1223 }, () => reject(new UserCanceled()))
+          .catch(only({ errno: 1223 }, () => reject(new UserCanceled())))
           .catch((err) => reject(err))
       );
     });
@@ -621,7 +630,7 @@ class DeploymentMethod extends LinkingDeployment {
   }
 
   private stopElevated() {
-    return new PromiseBB<void>((resolve, reject) => {
+    return new Promise<void>((resolve, reject) => {
       this.mDone = () => {
         resolve();
       };
@@ -705,7 +714,7 @@ const __req = undefined; // dummy
 function baseFunc(
   moduleRoot: string,
   ipcPath: string,
-  main: (ipc, req: NodeRequireFunction) => void | PromiseBB<void>,
+  main: (ipc, req: NodeRequireFunction) => void | Promise<void>,
 ) {
   const handleError = (error: any) => {
     // tslint:disable-next-line:no-console
@@ -727,7 +736,7 @@ function baseFunc(
   client
     .on("connect", () => {
       const res = main(client, __req);
-      // bit of a hack but the type "bluebird" isn't known in this context
+      // bit of a hack because this runs in an isolated elevated process
       if (res?.["catch"] !== undefined) {
         (res as any)
           .catch((error) => {
@@ -834,7 +843,7 @@ function installTask(scriptPath: string) {
     },
     { scriptPath, taskName, exePath, exeArgs },
   ).catch((err) =>
-    getErrorNativeCode(err) === 1223 ? PromiseBB.reject(new UserCanceled()) : PromiseBB.reject(err),
+    getErrorNativeCode(err) === 1223 ? Promise.reject(new UserCanceled()) : Promise.reject(err),
   );
 }
 
@@ -846,7 +855,7 @@ function ensureTaskEnabled(api: IExtensionApi, delayed: boolean) {
       // not checking if the task is actually set up correctly
       // (proper path and arguments for the action) so if we change any of those we
       // need migration code. If the user changes the task, screw them.
-      return PromiseBB.resolve();
+      return Promise.resolve();
     }
 
     if (delayed) {
@@ -997,7 +1006,7 @@ function migrate(api: IExtensionApi, oldVersion: string) {
       displayMS: null,
     });
   }
-  return PromiseBB.resolve();
+  return Promise.resolve();
 }
 
 const localState: { symlinkRight: boolean } = makeReactive({
@@ -1087,7 +1096,7 @@ function giveSymlinkRight(enable: boolean) {
     },
     { sid, enable },
   ).catch((err) =>
-    getErrorNativeCode(err) === 1223 ? PromiseBB.reject(new UserCanceled()) : PromiseBB.reject(err),
+    getErrorNativeCode(err) === 1223 ? Promise.reject(new UserCanceled()) : Promise.reject(err),
   );
 }
 

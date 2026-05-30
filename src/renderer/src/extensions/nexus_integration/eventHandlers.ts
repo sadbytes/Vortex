@@ -25,13 +25,13 @@ import type Nexus from "@nexusmods/nexus-api";
 import { NexusError, RateLimitError, TimeoutError } from "@nexusmods/nexus-api";
 import { getErrorMessageOrDefault, unknownToError } from "@vortex/shared";
 import { AlreadyDownloaded, DownloadIsHTML } from "@vortex/shared/errors";
-import Bluebird from "bluebird";
 import * as semver from "semver";
 
 import { setDownloadModInfo } from "../../actions";
 import { log } from "../../logging";
 import type { IExtensionApi, StateChangeCallback } from "../../types/IExtensionContext";
 import type { IDownload, IMod, IModTable, IState } from "../../types/IState";
+import { delay, map, only } from "../../util/asyncpromise";
 import { DataInvalid, ProcessCanceled, UserCanceled } from "../../util/CustomErrors";
 import Debouncer from "../../util/Debouncer";
 import * as fs from "../../util/fs";
@@ -83,7 +83,6 @@ import {
 import type { ITokenReply } from "./util/oauth";
 import submitFeedback from "./util/submitFeedback";
 import { makeModUID } from "./util/UIDs";
-
 export function onChangeDownloads(api: IExtensionApi, nexus: Nexus) {
   const state: IState = api.store.getState();
   // Cache for mod/file info to avoid duplicate API calls
@@ -95,7 +94,7 @@ export function onChangeDownloads(api: IExtensionApi, nexus: Nexus) {
       newDownloadTable: { [id: string]: IDownload },
     ) => {
       if (oldDownloadTable === newDownloadTable) {
-        return Bluebird.resolve();
+        return Promise.resolve();
       }
 
       // Only process downloads that have actually changed
@@ -114,10 +113,10 @@ export function onChangeDownloads(api: IExtensionApi, nexus: Nexus) {
       });
 
       if (changedDownloadIds.length === 0) {
-        return Bluebird.resolve();
+        return Promise.resolve();
       }
 
-      return Bluebird.map(
+      return map(
         changedDownloadIds,
         (dlId) => {
           const download = newDownloadTable[dlId];
@@ -125,7 +124,7 @@ export function onChangeDownloads(api: IExtensionApi, nexus: Nexus) {
           const fileId = getSafe(download, [...IDS_PATH, "fileId"], undefined);
 
           if (!modId) {
-            return Bluebird.resolve();
+            return Promise.resolve();
           }
 
           const rawGame =
@@ -144,9 +143,9 @@ export function onChangeDownloads(api: IExtensionApi, nexus: Nexus) {
           const fileInfoKey = fileId !== undefined ? `file_${modId}_${fileId}_${gameDomain}` : null;
 
           // Fetch mod info with caching
-          let modInfoBluebird = infoCache.get(modInfoKey);
-          if (!modInfoBluebird) {
-            modInfoBluebird = nexus.getModInfo(modId, gameDomain).catch((err) => {
+          let modInfoPromise = infoCache.get(modInfoKey);
+          if (!modInfoPromise) {
+            modInfoPromise = nexus.getModInfo(modId, gameDomain).catch((err) => {
               log("warn", "failed to query mod info", {
                 modId,
                 gameDomain,
@@ -155,11 +154,11 @@ export function onChangeDownloads(api: IExtensionApi, nexus: Nexus) {
               });
               return null;
             });
-            infoCache.set(modInfoKey, modInfoBluebird);
+            infoCache.set(modInfoKey, modInfoPromise);
           }
 
           // Fetch file info with caching (if needed)
-          let fileInfoBluebird = Bluebird.resolve(undefined);
+          let fileInfoPromise = Promise.resolve(undefined);
           if (fileId !== undefined && fileInfoKey) {
             let cachedFileInfo = infoCache.get(fileInfoKey);
             if (!cachedFileInfo) {
@@ -175,10 +174,10 @@ export function onChangeDownloads(api: IExtensionApi, nexus: Nexus) {
               });
               infoCache.set(fileInfoKey, cachedFileInfo);
             }
-            fileInfoBluebird = cachedFileInfo;
+            fileInfoPromise = cachedFileInfo;
           }
 
-          return Bluebird.all([modInfoBluebird, fileInfoBluebird])
+          return Promise.all([modInfoPromise, fileInfoPromise])
             .then(([modInfo, fileInfo]) => {
               const batched = [];
               if (modInfo !== null) {
@@ -190,7 +189,7 @@ export function onChangeDownloads(api: IExtensionApi, nexus: Nexus) {
 
               batchDispatch(api.store, batched);
             })
-            .catch((err) => {
+            .catch((err: any) => {
               log("error", "unexpected error processing download info", {
                 downloadId: dlId,
                 modId,
@@ -208,7 +207,7 @@ export function onChangeDownloads(api: IExtensionApi, nexus: Nexus) {
             entries.slice(-50).forEach(([key, value]) => infoCache.set(key, value));
           }
         })
-        .catch((err) => {
+        .catch((err: any) => {
           log("error", "failed to process download changes", {
             message: err.message,
           });
@@ -250,14 +249,14 @@ export function onChangeMods(api: IExtensionApi, nexus: Nexus) {
     ) {
       // for any mod where modid or download section have been changed,
       // retrieve the new mod info
-      return Bluebird.map(Object.keys(newModTable[gameMode]), (modId) => {
+      return map(Object.keys(newModTable[gameMode]), (modId) => {
         const modSource = getSafe(
           newModTable,
           [gameMode, modId, "attributes", "source"],
           undefined,
         );
         if (modSource !== "nexus") {
-          return Bluebird.resolve();
+          return Promise.resolve();
         }
 
         const idPath = [gameMode, modId, "attributes", "modId"];
@@ -277,12 +276,12 @@ export function onChangeMods(api: IExtensionApi, nexus: Nexus) {
             lastModTable = newModTable;
           });
         } else {
-          return Bluebird.resolve();
+          return Promise.resolve();
         }
       }).then(() => null);
     } else {
       lastModTable = newModTable;
-      return Bluebird.resolve();
+      return Promise.resolve();
     }
   }, 2000);
 
@@ -361,7 +360,7 @@ function downloadFile(
   fileId: number,
   fileName?: string,
   allowInstall?: boolean,
-): Bluebird<string> {
+): Promise<string> {
   const state: IState = api.getState();
   const gameId = game?.id ?? SITE_ID;
   if (
@@ -371,7 +370,7 @@ function downloadFile(
   ) {
     // nexusmods can't let users download files directly from client, without
     // showing ads
-    return Bluebird.reject(new ProcessCanceled("Only available to premium users"));
+    return Promise.reject(new ProcessCanceled("Only available to premium users"));
   }
   // TODO: Need some way to identify if this request is actually for a nexus mod
   const url = `nxm://${toNXMId(game, gameId)}/mods/${modId}/files/${fileId}`;
@@ -397,8 +396,8 @@ function downloadFile(
     const downloadPath = downloadPathForGame(state, gameId);
     return fs
       .statAsync(path.join(downloadPath, downloads[existingId].localPath))
-      .then(() => Bluebird.resolve(existingId))
-      .catch((err) =>
+      .then(() => Promise.resolve(existingId))
+      .catch((err: any) =>
         err.code === "ENOENT"
           ? startDownload(
               api,
@@ -408,7 +407,7 @@ function downloadFile(
               fileName,
               allowInstall,
             )
-          : Bluebird.reject(err),
+          : Promise.reject(err),
       );
   } else {
     // startDownload will report network errors and only reject on usage error
@@ -493,17 +492,19 @@ export function onModUpdate(api: IExtensionApi, nexus: Nexus) {
     const downloadFunc = () =>
       truthy(game)
         ? downloadFile(api, nexus, { ...game, downloadGameId }, modId, fileId, undefined, false)
-        : Bluebird.reject(new ProcessCanceled("Game not found")); // Can't download an update for a game extension that doesn't exist
+        : Promise.reject(new ProcessCanceled("Game not found")); // Can't download an update for a game extension that doesn't exist
 
     downloadFunc()
-      .catch(AlreadyDownloaded, (err) => {
-        const state = api.getState();
-        const downloads = state.persistent.downloads.files;
-        const dlId = Object.keys(downloads).find(
-          (iter) => downloads[iter].localPath === err.fileName,
-        );
-        return dlId;
-      })
+      .catch(
+        only(AlreadyDownloaded, (err) => {
+          const state = api.getState();
+          const downloads = state.persistent.downloads.files;
+          const dlId = Object.keys(downloads).find(
+            (iter) => downloads[iter].localPath === err.fileName,
+          );
+          return dlId;
+        }),
+      )
       .then((downloadId) => {
         const state = api.getState();
         const downloads = state.persistent.downloads.files;
@@ -516,16 +517,20 @@ export function onModUpdate(api: IExtensionApi, nexus: Nexus) {
           api.events.emit("start-install-download", downloadId);
         }
       })
-      .catch(DownloadIsHTML, (err) => undefined)
-      .catch(DataInvalid, () => {
-        const url = `nxm://${toNXMId(game, gameId)}/mods/${modId}/files/${fileId}`;
-        api.showErrorNotification("Invalid URL", url, { allowReport: false });
-      })
-      .catch(ProcessCanceled, () => {
-        const url = [NEXUS_BASE_URL, nexusGameId(game, gameId), "mods", modId].join("/");
-        const params = `?tab=files&file_id=${fileId}&nmm=1`;
-        return opn(url + params).catch(() => undefined);
-      })
+      .catch(only(DownloadIsHTML, (err) => undefined))
+      .catch(
+        only(DataInvalid, () => {
+          const url = `nxm://${toNXMId(game, gameId)}/mods/${modId}/files/${fileId}`;
+          api.showErrorNotification("Invalid URL", url, { allowReport: false });
+        }),
+      )
+      .catch(
+        only(ProcessCanceled, () => {
+          const url = [NEXUS_BASE_URL, nexusGameId(game, gameId), "mods", modId].join("/");
+          const params = `?tab=files&file_id=${fileId}&nmm=1`;
+          return opn(url + params).catch(() => undefined);
+        }),
+      )
       .catch((err) => {
         api.showErrorNotification("Failed to start download", err);
       });
@@ -535,14 +540,14 @@ export function onModUpdate(api: IExtensionApi, nexus: Nexus) {
 export function onNexusDownload(
   api: IExtensionApi,
   nexus: Nexus,
-): (...args: any[]) => Bluebird<any> {
+): (...args: any[]) => Promise<any> {
   return (
     gameId: string,
     modId: number,
     fileId: number,
     fileName?: string,
     allowInstall?: boolean,
-  ): Bluebird<string> => {
+  ): Promise<string> => {
     const game = gameId === SITE_ID ? null : gameById(api.store.getState(), gameId);
     log("debug", "on nexus download", fileName);
     return ensureLoggedIn(api)
@@ -558,27 +563,33 @@ export function onNexusDownload(
             allowInstall,
           );
         } else {
-          return Bluebird.reject(new ProcessCanceled("Game not found"));
+          return Promise.reject(new ProcessCanceled("Game not found"));
         }
       })
-      .catch(UserCanceled, () => {
-        return Bluebird.resolve(undefined);
-      })
-      .catch(ProcessCanceled, (err) => {
-        api.sendNotification({
-          type: "error",
-          message: err.message,
-        });
-        return Bluebird.resolve(undefined);
-      })
-      .catch(AlreadyDownloaded, (err) => {
-        const { files } = api.getState().persistent.downloads;
-        const dlId = Object.keys(files).find((iter) => files[iter].localPath === err.fileName);
-        return Bluebird.resolve(dlId);
-      })
+      .catch(
+        only(UserCanceled, () => {
+          return Promise.resolve(undefined);
+        }),
+      )
+      .catch(
+        only(ProcessCanceled, (err) => {
+          api.sendNotification({
+            type: "error",
+            message: err.message,
+          });
+          return Promise.resolve(undefined);
+        }),
+      )
+      .catch(
+        only(AlreadyDownloaded, (err) => {
+          const { files } = api.getState().persistent.downloads;
+          const dlId = Object.keys(files).find((iter) => files[iter].localPath === err.fileName);
+          return Promise.resolve(dlId);
+        }),
+      )
       .catch((err) => {
         api.showErrorNotification("Nexus download failed", err);
-        return Bluebird.resolve(undefined);
+        return Promise.resolve(undefined);
       });
   };
 }
@@ -634,41 +645,43 @@ export function onGetMyCollections(
 export function onGetNexusCollection(
   api: IExtensionApi,
   nexus: Nexus,
-): (slug: string) => Bluebird<ICollection> {
-  return (slug: string): Bluebird<ICollection> => {
+): (slug: string) => Promise<ICollection> {
+  return (slug: string): Promise<ICollection> => {
     if (slug === undefined) {
-      return Bluebird.reject(new Error("invalid parameter, collectionId has to be a number"));
+      return Promise.reject(new Error("invalid parameter, collectionId has to be a number"));
     }
 
-    return Bluebird.resolve(nexus.getCollectionGraph(FULL_COLLECTION_INFO, slug)).catch((err) => {
-      if (!["COLLECTION_DISCARDED", "NOT_FOUND"].includes(err.code)) {
-        if (err.code === "COLLECTION_UNDER_MODERATION") {
-          api.showErrorNotification(
-            "Failed to get collection info",
-            "The collection is under moderation",
-            {
-              allowReport: false,
-            },
-          );
-        } else {
-          const allowReport = !(err instanceof ProcessCanceled);
-          api.showErrorNotification("Failed to get collection info", err, {
-            id: "failed-get-collection-info",
-            allowReport,
-          });
+    return Promise.resolve(nexus.getCollectionGraph(FULL_COLLECTION_INFO, slug)).catch(
+      (err: any) => {
+        if (!["COLLECTION_DISCARDED", "NOT_FOUND"].includes(err.code)) {
+          if (err.code === "COLLECTION_UNDER_MODERATION") {
+            api.showErrorNotification(
+              "Failed to get collection info",
+              "The collection is under moderation",
+              {
+                allowReport: false,
+              },
+            );
+          } else {
+            const allowReport = !(err instanceof ProcessCanceled);
+            api.showErrorNotification("Failed to get collection info", err, {
+              id: "failed-get-collection-info",
+              allowReport,
+            });
+          }
         }
-      }
-      return Bluebird.resolve(undefined);
-    });
+        return Promise.resolve(undefined);
+      },
+    );
   };
 }
 
 export function onGetNexusCollections(
   api: IExtensionApi,
   nexus: Nexus,
-): (gameId: string) => Bluebird<Partial<ICollection>[] | undefined> {
+): (gameId: string) => Promise<Partial<ICollection>[] | undefined> {
   return (gameId: string) =>
-    Bluebird.resolve(nexus.getCollectionListGraph(FULL_COLLECTION_INFO, gameId)).catch((err) =>
+    Promise.resolve(nexus.getCollectionListGraph(FULL_COLLECTION_INFO, gameId)).catch((err) =>
       handleGraphError<Partial<ICollection>[] | undefined>(api, err, {
         title: "Failed to get list of collections",
         fallback: undefined,
@@ -681,25 +694,25 @@ export function onGetNexusCollections(
  *
  * @param {Nexus} nexus - The Nexus API instance
  * @param {types.ICollectionSearchOptions} options - Search options (gameId, filters, sort, etc.)
- * @return {Bluebird<types.ICollectionSearchResult>} Search results with nodes and totalCount
+ * @return {Promise<types.ICollectionSearchResult>} Search results with nodes and totalCount
  */
 export function onSearchCollections(
   api: IExtensionApi,
   nexus: Nexus,
   query?: ICollectionQuery,
-): (options: ICollectionSearchOptions) => Bluebird<ICollectionSearchResult> {
+): (options: ICollectionSearchOptions) => Promise<ICollectionSearchResult> {
   const searchQuery = query || COLLECTION_SEARCH_QUERY;
   return (options) => {
-    return Bluebird.resolve(nexus.searchCollectionsGraph(searchQuery, options));
+    return Promise.resolve(nexus.searchCollectionsGraph(searchQuery, options));
   };
 }
 
 export function onResolveCollectionUrl(
   api: IExtensionApi,
   nexus: Nexus,
-): (apiLink: string) => Bluebird<IDownloadURL[]> {
-  return (apiLink: string): Bluebird<IDownloadURL[]> =>
-    Bluebird.resolve(nexus.getCollectionDownloadLink(apiLink)).catch((err) =>
+): (apiLink: string) => Promise<IDownloadURL[]> {
+  return (apiLink: string): Promise<IDownloadURL[]> =>
+    Promise.resolve(nexus.getCollectionDownloadLink(apiLink)).catch((err) =>
       handleGraphError<IDownloadURL[]>(api, err, {
         title: "Failed to get list of collections",
         fallback: [],
@@ -710,21 +723,21 @@ export function onResolveCollectionUrl(
 export function onGetNexusCollectionRevision(
   api: IExtensionApi,
   nexus: Nexus,
-): (collectionSlug: string, revisionNumber: number) => Bluebird<IRevision> {
-  return (collectionSlug: string, revisionNumber: number): Bluebird<IRevision> => {
+): (collectionSlug: string, revisionNumber: number) => Promise<IRevision> {
+  return (collectionSlug: string, revisionNumber: number): Promise<IRevision> => {
     if (collectionSlug === undefined) {
       const err = new Error("invalid parameter, collectionSlug undefined");
       err["attachLogOnReport"] = true;
       api.showErrorNotification("invalid parameter", err);
-      return Bluebird.resolve(undefined);
+      return Promise.resolve(undefined);
     } else if (!Number.isFinite(revisionNumber)) {
-      return Bluebird.reject(
+      return Promise.reject(
         new Error(
           "invalid parameter, revisionNumber has to be a number, " + `got: ${revisionNumber}`,
         ),
       );
     }
-    return Bluebird.resolve(
+    return Promise.resolve(
       nexus.getCollectionRevisionGraph(
         FULL_REVISION_INFO,
         collectionSlug,
@@ -751,7 +764,7 @@ export function onGetNexusCollectionRevision(
           allowReport,
         });
       }
-      return Bluebird.resolve(undefined);
+      return Promise.resolve(undefined);
     });
   };
 }
@@ -810,11 +823,11 @@ interface IRateRevisionResult {
 export function onRateRevision(
   api: IExtensionApi,
   nexus: Nexus,
-): (revisionId: number, rating: number) => Bluebird<IRateRevisionResult> {
-  return (revisionId: number, rating: any): Bluebird<IRateRevisionResult> => {
-    return Bluebird.resolve(nexus.rateRevision(revisionId, rating)).catch((err) => {
+): (revisionId: number, rating: number) => Promise<IRateRevisionResult> {
+  return (revisionId: number, rating: any): Promise<IRateRevisionResult> => {
+    return Promise.resolve(nexus.rateRevision(revisionId, rating)).catch((err: any) => {
       reportRateError(api, err, revisionId);
-      return Bluebird.resolve({ success: false });
+      return Promise.resolve({ success: false });
     });
   };
 }
@@ -827,11 +840,11 @@ interface IDownloadResult {
 export function onGetModFiles(
   api: IExtensionApi,
   nexus: Nexus,
-): (...args: any[]) => Bluebird<IFileInfo[]> {
-  return (gameId: string, modId: number): Bluebird<IFileInfo[]> => {
+): (...args: any[]) => Promise<IFileInfo[]> {
+  return (gameId: string, modId: number): Promise<IFileInfo[]> => {
     const state = api.getState();
     const game = gameById(state, gameId);
-    return Bluebird.resolve(nexus.getModFiles(modId, nexusGameId(game, gameId) || gameId))
+    return Promise.resolve(nexus.getModFiles(modId, nexusGameId(game, gameId) || gameId))
       .then((result) => result.files)
       .catch((err) =>
         handleGraphError<IFileInfo[]>(api, err, {
@@ -846,14 +859,14 @@ export function onGetModFiles(
 export function onModFileContents(
   api: IExtensionApi,
   nexus: Nexus,
-): (...args: any[]) => Bluebird<Partial<IModFileContentPage>> {
+): (...args: any[]) => Promise<Partial<IModFileContentPage>> {
   return (
     query: IModFileContentPageQuery,
     filter?: IModFileContentSearchFilter,
     offset?: number,
     count?: number,
   ) => {
-    return Bluebird.resolve(nexus.modFileContents(query, filter, offset, count)).catch((err) =>
+    return Promise.resolve(nexus.modFileContents(query, filter, offset, count)).catch((err) =>
       handleGraphError(api, err, {
         title: "Failed to get mod file contents",
         fallback: {},
@@ -869,11 +882,11 @@ export function onModFileContents(
 export function onGetModInfo(
   api: IExtensionApi,
   nexus: Nexus,
-): (gameId: string, modId: number) => Bluebird<Partial<IModInfo>> {
+): (gameId: string, modId: number) => Promise<Partial<IModInfo>> {
   return (gameId: string, modId: number) => {
     const state = api.getState();
     const game = gameById(state, gameId);
-    return Bluebird.resolve(nexus.getModInfo(modId, nexusGameId(game, gameId) || gameId)).catch(
+    return Promise.resolve(nexus.getModInfo(modId, nexusGameId(game, gameId) || gameId)).catch(
       (err) =>
         handleGraphError(api, err, {
           title: "Failed to get mod info",
@@ -897,17 +910,17 @@ export function onGetModInfo(
 export function onGetModRequirements(
   api: IExtensionApi,
   nexus: Nexus,
-): (gameId: string, modIds: number[]) => Bluebird<{ [modId: number]: Partial<IModRequirements> }> {
+): (gameId: string, modIds: number[]) => Promise<{ [modId: number]: Partial<IModRequirements> }> {
   return (gameId: string, modIds: number[]) => {
     const state = api.getState();
     const game = gameById(state, gameId);
     const nexusGameDomain = nexusGameId(game, gameId) || gameId;
 
     if (modIds.length === 0) {
-      return Bluebird.resolve({});
+      return Promise.resolve({});
     }
 
-    return Bluebird.resolve(
+    return Promise.resolve(
       (async () => {
         // makeModUID needs the nexus games list to map domain -> numeric game id.
         // This should've been done on startup, but there appears to be
@@ -993,7 +1006,7 @@ export function onGetModRequirements(
             ...graphErrorContext(err),
           });
         }
-        return Bluebird.resolve({});
+        return Promise.resolve({});
       });
   };
 }
@@ -1029,7 +1042,7 @@ export function onGetPreferences(
 export function onDownloadUpdate(
   api: IExtensionApi,
   nexus: Nexus,
-): (...args: any[]) => Bluebird<IDownloadResult> {
+): (...args: any[]) => Promise<IDownloadResult> {
   return (
     source: string,
     gameId: string,
@@ -1038,9 +1051,9 @@ export function onDownloadUpdate(
     versionPattern: string,
     campaign: string,
     referenceTag?: string,
-  ): Bluebird<IDownloadResult> => {
+  ): Promise<IDownloadResult> => {
     if (source !== "nexus") {
-      return Bluebird.resolve(undefined);
+      return Promise.resolve(undefined);
     }
 
     const state = api.getState();
@@ -1054,12 +1067,12 @@ export function onDownloadUpdate(
         title: "Invalid game id",
         message: gameId,
       });
-      return Bluebird.resolve(undefined);
+      return Promise.resolve(undefined);
     }
 
     const fileIdNum = parseInt(fileId, 10);
 
-    return Bluebird.resolve(
+    return Promise.resolve(
       nexus.getModFiles(parseInt(modId, 10), nexusGameId(game, gameId) || gameId),
     )
       .then((files) => {
@@ -1119,11 +1132,13 @@ export function onDownloadUpdate(
 
         if (existingId !== undefined) {
           if (downloads[existingId].state === "paused") {
-            return Bluebird.fromCallback((cb) =>
-              api.events.emit("resume-download", existingId, cb),
+            return new Promise<void>((resolve, reject) =>
+              api.events.emit("resume-download", existingId, (err: Error) =>
+                err ? reject(err) : resolve(),
+              ),
             ).then(() => ({ error: null, dlId: existingId }));
           } else {
-            return Bluebird.resolve({ error: null, dlId: existingId });
+            return Promise.resolve({ error: null, dlId: existingId });
           }
         }
 
@@ -1138,9 +1153,9 @@ export function onDownloadUpdate(
           referenceTag,
         )
           .then((dlId) => ({ error: null, dlId }))
-          .catch((err) => ({ error: err }));
+          .catch((err: Error) => ({ error: err }));
       })
-      .catch((err) => {
+      .catch((err: Error) => {
         if (err instanceof UserCanceled) {
           // there is a really good chance that the download will fail
           log("warn", "failed to fetch mod file list", err.message);
@@ -1160,9 +1175,9 @@ export function onDownloadUpdate(
             referenceTag,
           )
             .then((dlId) => ({ error: null, dlId }))
-            .catch((innerErr) => ({ error: innerErr }));
+            .catch((innerErr: Error) => ({ error: innerErr }));
         } else {
-          return Bluebird.resolve({ error: err });
+          return Promise.resolve({ error: err });
         }
       });
   };
@@ -1179,7 +1194,7 @@ export function onSubmitFeedback(nexus: Nexus) {
   ) => {
     submitFeedback(nexus, title, message, feedbackFiles, anonymous, hash)
       .then((response) => callback(null, response))
-      .catch((err) => callback(err));
+      .catch((err: any) => callback(err));
   };
 }
 
@@ -1254,7 +1269,7 @@ export function onEndorseDirect(api: IExtensionApi, nexus: Nexus) {
     nexusId: number,
     version: string,
     endorsedStatus: EndorsedStatus,
-  ): Bluebird<EndorsedStatus> => {
+  ): Promise<EndorsedStatus> => {
     return endorseDirectImpl(api, nexus, gameId, nexusId, version, endorsedStatus).then(
       (res) => res as EndorsedStatus,
     );
@@ -1277,10 +1292,10 @@ function extractLatestModInfo(state: IState, gameId: string, input: IModInfo): I
 }
 
 export function onGetLatestMods(api: IExtensionApi, nexus: Nexus) {
-  return (gameId: string): Bluebird<{ id: string; encoding: string; mods: IModListItem[] }> => {
+  return (gameId: string): Promise<{ id: string; encoding: string; mods: IModListItem[] }> => {
     const state = api.getState();
     const gameDomain = nexusGameId(gameById(state, gameId), gameId);
-    return Bluebird.resolve(nexus.getLatestAdded(gameDomain)).then((mods) => ({
+    return Promise.resolve(nexus.getLatestAdded(gameDomain)).then((mods) => ({
       id: "nexus",
       encoding: "bbcode",
       mods: mods
@@ -1291,7 +1306,7 @@ export function onGetLatestMods(api: IExtensionApi, nexus: Nexus) {
 }
 
 export function onRefreshUserInfo(nexus: Nexus, api: IExtensionApi) {
-  return (): Bluebird<void> => {
+  return (): Promise<void> => {
     // only called from the global menu item
 
     //const token = getOAuthTokenFromState(api);
@@ -1301,12 +1316,12 @@ export function onRefreshUserInfo(nexus: Nexus, api: IExtensionApi) {
     // we have an oauth token in state
     //if(token !== undefined) {
     // get userinfo from api
-    return Bluebird.resolve(nexus.getUserInfo())
+    return Promise.resolve(nexus.getUserInfo())
       .then((apiUserInfo) => {
         api.store.dispatch(setUserInfo(transformUserInfoFromApi(apiUserInfo)));
         log("info", "onRefreshUserInfo() nexus.getUserInfo response", apiUserInfo);
       })
-      .catch((err) => {
+      .catch((err: any) => {
         log("error", `onRefreshUserInfo() nexus.getUserInfo response ${err.message}`, err);
         showError(api.store.dispatch, "An error occurred refreshing user info", err, {
           allowReport: false,
@@ -1319,10 +1334,10 @@ export function onRefreshUserInfo(nexus: Nexus, api: IExtensionApi) {
 }
 
 export function onGetTrendingMods(api: IExtensionApi, nexus: Nexus) {
-  return (gameId: string): Bluebird<{ id: string; encoding: string; mods: IModListItem[] }> => {
+  return (gameId: string): Promise<{ id: string; encoding: string; mods: IModListItem[] }> => {
     const state = api.getState();
     const gameDomain = nexusGameId(gameById(state, gameId), gameId);
-    return Bluebird.resolve(nexus.getTrending(gameDomain)).then((mods) => ({
+    return Promise.resolve(nexus.getTrending(gameDomain)).then((mods) => ({
       id: "nexus",
       encoding: "bbcode",
       mods: mods
@@ -1358,7 +1373,7 @@ export function onOAuthTokenChanged(api: IExtensionApi, nexus: Nexus): StateChan
 export function onCheckModsVersion(
   api: IExtensionApi,
   nexus: Nexus,
-): (...args: any[]) => Bluebird<string[]> {
+): (...args: any[]) => Promise<string[]> {
   return (gameId, mods, forceFull) => {
     if (!isLoggedIn(api.getState())) {
       api.showErrorNotification(
@@ -1366,7 +1381,7 @@ export function onCheckModsVersion(
         "You are not logged in to Nexus Mods!",
         { allowReport: false },
       );
-      return Bluebird.resolve([]);
+      return Promise.resolve([]);
     } else {
       api.store.dispatch(setUpdatingMods(gameId, true));
       const start = Date.now();
@@ -1380,37 +1395,45 @@ export function onCheckModsVersion(
               { allowReport: false, isBBCode: true },
             );
           }
-          return Bluebird.resolve(modIds);
+          return Promise.resolve(modIds);
         })
-        .catch(NexusError, (err) => {
-          showError(api.store.dispatch, "An error occurred checking for mod updates", err, {
-            allowReport: false,
-          });
-          return Bluebird.resolve([]);
-        })
-        .catch(TimeoutError, (err) => {
-          showError(api.store.dispatch, "An error occurred checking for mod updates", err, {
-            allowReport: false,
-          });
-          return Bluebird.resolve([]);
-        })
-        .catch(RateLimitError, (err) => {
-          showError(api.store.dispatch, "Rate limit exceeded, please try again later", err, {
-            allowReport: false,
-          });
-          return Bluebird.resolve([]);
-        })
-        .catch(ProcessCanceled, (err) => {
-          showError(api.store.dispatch, "An error occurred checking for mod updates", err, {
-            allowReport: false,
-          });
-          return Bluebird.resolve([]);
-        })
+        .catch(
+          only(NexusError, (err) => {
+            showError(api.store.dispatch, "An error occurred checking for mod updates", err, {
+              allowReport: false,
+            });
+            return Promise.resolve([]);
+          }),
+        )
+        .catch(
+          only(TimeoutError, (err) => {
+            showError(api.store.dispatch, "An error occurred checking for mod updates", err, {
+              allowReport: false,
+            });
+            return Promise.resolve([]);
+          }),
+        )
+        .catch(
+          only(RateLimitError, (err) => {
+            showError(api.store.dispatch, "Rate limit exceeded, please try again later", err, {
+              allowReport: false,
+            });
+            return Promise.resolve([]);
+          }),
+        )
+        .catch(
+          only(ProcessCanceled, (err) => {
+            showError(api.store.dispatch, "An error occurred checking for mod updates", err, {
+              allowReport: false,
+            });
+            return Promise.resolve([]);
+          }),
+        )
         .catch((err) => {
           showError(api.store.dispatch, "An error occurred checking for mod updates", err);
-          return Bluebird.resolve([]);
+          return Promise.resolve([]);
         })
-        .then((modIds: string[]) => Bluebird.delay(2000 - (Date.now() - start)).then(() => modIds))
+        .then((modIds: string[]) => delay(2000 - (Date.now() - start)).then(() => modIds))
         .finally(() => {
           api.store.dispatch(setUpdatingMods(gameId, false));
         });

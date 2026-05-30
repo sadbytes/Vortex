@@ -2,7 +2,6 @@ import { createHash } from "crypto";
 
 import { CollectionPermission, ICollectionPermission } from "@nexusmods/nexus-api";
 import type { types } from "@nexusmods/vortex-api";
-import Bluebird from "bluebird";
 
 import type { ICollectionModRuleEx } from "../types/ICollection";
 import type { IModEx } from "../types/IModEx";
@@ -17,8 +16,8 @@ export function hasEditPermissions(permissions: ICollectionPermission[]): boolea
   return allPermissions.includes("collection:edit");
 }
 
-export function bbProm<T>(func: (...args: any[]) => Promise<T>): (...args: any[]) => Bluebird<T> {
-  return (...args: any[]) => Bluebird.resolve(func(...args));
+export function bbProm<T>(func: (...args: any[]) => Promise<T>): (...args: any[]) => Promise<T> {
+  return (...args: any[]) => Promise.resolve(func(...args));
 }
 
 export function getUnfulfilledNotificationId(collectionId: string) {

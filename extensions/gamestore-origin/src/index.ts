@@ -2,7 +2,6 @@ import * as path from "node:path";
 import * as queryParser from "querystring";
 
 import { fs, log, types, util } from "@nexusmods/vortex-api";
-import PromiseBB from "bluebird";
 import turbowalk, { IEntry } from "turbowalk";
 import * as winapi from "winapi-bindings";
 import { parseStringPromise } from "xml2js";
@@ -39,8 +38,8 @@ class OriginLauncher implements types.IGameStore {
   public id: string = STORE_ID;
   public name: string = STORE_NAME;
   public priority: number = STORE_PRIORITY;
-  private mClientPath: PromiseBB<string>;
-  private mCache: PromiseBB<types.IGameStoreEntry[]>;
+  private mClientPath: Promise<string>;
+  private mCache: Promise<types.IGameStoreEntry[]>;
 
   constructor() {
     if (process.platform === "win32") {
@@ -50,17 +49,17 @@ class OriginLauncher implements types.IGameStore {
           "SOFTWARE\\WOW6432Node\\Origin",
           "ClientPath",
         );
-        this.mClientPath = PromiseBB.resolve(clientPath.value as string);
+        this.mClientPath = Promise.resolve(clientPath.value as string);
       } catch (err) {
         log("info", "Origin launcher not found", { error: err.message });
-        this.mClientPath = PromiseBB.resolve(undefined);
+        this.mClientPath = Promise.resolve(undefined);
       }
     } else {
-      this.mClientPath = PromiseBB.resolve(undefined);
+      this.mClientPath = Promise.resolve(undefined);
     }
   }
 
-  public launchGame(appId: string): PromiseBB<void> {
+  public launchGame(appId: string): Promise<void> {
     return this.getPosixPath(appId).then((posPath) =>
       util.opn(posPath).catch((err) => {
         log("debug", "Origin game launch failed", err);
@@ -71,20 +70,20 @@ class OriginLauncher implements types.IGameStore {
 
   public getPosixPath(name) {
     const posixPath = `origin2://game/launch?offerIds=${name}`;
-    return PromiseBB.resolve(posixPath);
+    return Promise.resolve(posixPath);
   }
 
   public queryPath() {
     return this.mClientPath;
   }
 
-  public isGameInstalled(name: string): PromiseBB<boolean> {
+  public isGameInstalled(name: string): Promise<boolean> {
     return this.findByName(name)
       .then(() => Promise.resolve(true))
       .catch((err) => Promise.resolve(false));
   }
 
-  public findByAppId(appId: string | string[]): PromiseBB<types.IGameStoreEntry> {
+  public findByAppId(appId: string | string[]): Promise<types.IGameStoreEntry> {
     const matcher = Array.isArray(appId)
       ? (entry: types.IGameStoreEntry) => appId.includes(entry.appid)
       : (entry: types.IGameStoreEntry) => appId === entry.appid;
@@ -103,7 +102,7 @@ class OriginLauncher implements types.IGameStore {
       );
   }
 
-  public findByName(namePattern: string): PromiseBB<types.IGameStoreEntry> {
+  public findByName(namePattern: string): Promise<types.IGameStoreEntry> {
     const re = new RegExp("^" + namePattern + "$");
     return this.allGames()
       .then((entries) => entries.find((entry) => re.test(entry.name)))
@@ -114,19 +113,19 @@ class OriginLauncher implements types.IGameStore {
       );
   }
 
-  public getGameStorePath(): PromiseBB<string> {
-    return !!this.mClientPath ? this.mClientPath : PromiseBB.resolve(undefined);
+  public getGameStorePath(): Promise<string> {
+    return !!this.mClientPath ? this.mClientPath : Promise.resolve(undefined);
   }
 
-  public allGames(): PromiseBB<types.IGameStoreEntry[]> {
+  public allGames(): Promise<types.IGameStoreEntry[]> {
     if (!this.mCache) {
       this.mCache = this.parseLocalContent();
     }
     return this.mCache;
   }
 
-  public reloadGames(): PromiseBB<void> {
-    return new PromiseBB((resolve) => {
+  public reloadGames(): Promise<void> {
+    return new Promise((resolve) => {
       this.mCache = this.parseLocalContent();
       return resolve();
     });
@@ -155,7 +154,7 @@ class OriginLauncher implements types.IGameStore {
     return Promise.reject(new MissingXMLElementError("gameTitle(en_US)"));
   }
 
-  private parseLocalContent(): PromiseBB<types.IGameStoreEntry[]> {
+  private parseLocalContent(): Promise<types.IGameStoreEntry[]> {
     const localData = path.join(ORIGIN_DATAPATH, "LocalContent");
     const allEntries: IEntry[] = [];
     return turbowalk(localData, (entries) => {
@@ -169,7 +168,7 @@ class OriginLauncher implements types.IGameStore {
           (manifest) => path.extname(manifest.filePath) === MANIFEST_EXT,
         );
 
-        return PromiseBB.reduce(
+        return util.reduce(
           manifests,
           (accum: types.IGameStoreEntry[], manifest: IEntry) =>
             fs.readFileAsync(manifest.filePath, { encoding: "utf-8" }).then((data) => {
@@ -194,7 +193,7 @@ class OriginLauncher implements types.IGameStore {
                 return fs
                   .statAsync(installerFilepath)
                   .then(() =>
-                    PromiseBB.any([
+                    Promise.any([
                       this.getGameName(installerFilepath, "DiPManifest"),
                       this.getGameName(installerFilepath, "default"),
                     ]),

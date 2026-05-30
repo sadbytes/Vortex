@@ -1,7 +1,6 @@
 import * as path from "path";
 import * as util from "util";
 
-import PromiseBB from "bluebird";
 import type { TFunction } from "i18next";
 import type { IEntry } from "turbowalk";
 import turbowalk from "turbowalk";
@@ -9,6 +8,7 @@ import turbowalk from "turbowalk";
 import { setSettingsPage } from "../../actions/session";
 import type { IExtensionApi, IExtensionContext } from "../../types/IExtensionContext";
 import type { IGame } from "../../types/IGame";
+import { map, only } from "../../util/asyncpromise";
 import { UserCanceled } from "../../util/CustomErrors";
 import * as fs from "../../util/fs";
 import { log } from "../../util/log";
@@ -23,7 +23,6 @@ import type {
   IDeploymentMethod,
   IUnavailableReason,
 } from "../mod_management/types/IDeploymentMethod";
-
 const LNK_EXT = ".vortex_lnk";
 
 interface ILinkData {
@@ -135,7 +134,7 @@ class DeploymentMethod extends LinkingDeployment {
             );
           },
           fixCallback: (api: IExtensionApi) =>
-            new PromiseBB((resolve, reject) => {
+            new Promise((resolve, reject) => {
               api.events.emit("show-main-page", "application_settings");
               api.store.dispatch(setSettingsPage("Mods"));
               api.highlightControl(
@@ -161,7 +160,7 @@ class DeploymentMethod extends LinkingDeployment {
     return undefined;
   }
 
-  public onSelected(api: IExtensionApi): PromiseBB<void> {
+  public onSelected(api: IExtensionApi): Promise<void> {
     return api
       .showDialog(
         "question",
@@ -178,7 +177,7 @@ class DeploymentMethod extends LinkingDeployment {
         [{ label: "Cancel" }, { label: "Continue" }],
       )
       .then((result) =>
-        result.action === "Cancel" ? PromiseBB.reject(new UserCanceled()) : PromiseBB.resolve(),
+        result.action === "Cancel" ? Promise.reject(new UserCanceled()) : Promise.resolve(),
       );
   }
 
@@ -210,7 +209,7 @@ class DeploymentMethod extends LinkingDeployment {
     return super.finalize(gameId, dataPath, installationPath, progressCB);
   }
 
-  public deactivate(sourcePath: string, dataPath: string, sourceName: string): PromiseBB<void> {
+  public deactivate(sourcePath: string, dataPath: string, sourceName: string): Promise<void> {
     return turbowalk(sourcePath, (entries) => {
       if (this.context === undefined) {
         return;
@@ -240,7 +239,7 @@ class DeploymentMethod extends LinkingDeployment {
     return input;
   }
 
-  protected purgeLinks(installationPath: string, dataPath: string): PromiseBB<void> {
+  protected purgeLinks(installationPath: string, dataPath: string): Promise<void> {
     let links: IEntry[] = [];
 
     // find lnk files in our mods directory
@@ -252,7 +251,9 @@ class DeploymentMethod extends LinkingDeployment {
       {
         details: true,
       },
-    ).then(() => PromiseBB.map(links, (entry) => this.restoreLink(entry.filePath)));
+    )
+      .then(() => map(links, (entry) => this.restoreLink(entry.filePath)))
+      .then(() => undefined);
   }
 
   protected linkFile(linkPath: string, sourcePath: string, dirTags?: boolean): Promise<void> {
@@ -264,11 +265,11 @@ class DeploymentMethod extends LinkingDeployment {
     return this.ensureDir(basePath).then(() => this.createLink(sourcePath, linkPath));
   }
 
-  protected unlinkFile(linkPath: string, sourcePath: string): PromiseBB<void> {
+  protected unlinkFile(linkPath: string, sourcePath: string): Promise<void> {
     return this.restoreLink(sourcePath + LNK_EXT);
   }
 
-  protected isLink(linkPath: string, sourcePath: string): PromiseBB<boolean> {
+  protected isLink(linkPath: string, sourcePath: string): Promise<boolean> {
     return fs
       .readFileAsync(sourcePath + LNK_EXT, { encoding: "utf-8" })
       .then((data) => {
@@ -279,47 +280,47 @@ class DeploymentMethod extends LinkingDeployment {
           return false;
         }
       })
-      .catch((err) => (err.code === "ENOENT" ? PromiseBB.resolve(false) : PromiseBB.reject(err)));
+      .catch((err: any) => (err.code === "ENOENT" ? Promise.resolve(false) : Promise.reject(err)));
   }
 
   protected canRestore(): boolean {
     return true;
   }
 
-  protected stat(filePath: string): PromiseBB<fs.Stats> {
+  protected stat(filePath: string): Promise<fs.Stats> {
     return fs
       .statAsync(filePath)
-      .catch((err) =>
-        err.code === "ENOENT" ? this.statVortexLink(filePath) : PromiseBB.reject(err),
+      .catch((err: any) =>
+        err.code === "ENOENT" ? this.statVortexLink(filePath) : Promise.reject(err),
       );
   }
 
-  protected statLink(filePath: string): PromiseBB<fs.Stats> {
-    return PromiseBB.resolve(fs.lstatAsync(filePath));
+  protected statLink(filePath: string): Promise<fs.Stats> {
+    return Promise.resolve(fs.lstatAsync(filePath));
   }
 
-  private readLink(filePath: string): PromiseBB<ILinkData> {
+  private readLink(filePath: string): Promise<ILinkData> {
     return fs.readFileAsync(filePath + LNK_EXT, { encoding: "utf-8" }).then((data) => {
       try {
         const obj: ILinkData = JSON.parse(data);
         if (obj.target === undefined) {
           throw new Error("target missing");
         }
-        return PromiseBB.resolve(obj);
+        return Promise.resolve(obj);
       } catch (err) {
         const error: any = new Error("Invalid link");
         error.code = "ENOENT";
         error.path = filePath;
-        return PromiseBB.reject(error);
+        return Promise.reject(error);
       }
     });
   }
 
-  private statVortexLink(filePath: string): PromiseBB<fs.Stats> {
+  private statVortexLink(filePath: string): Promise<fs.Stats> {
     return this.readLink(filePath).then((linkInfo) => fs.statAsync(linkInfo.target));
   }
 
-  private createLink(sourcePath: string, linkPath: string): PromiseBB<void> {
+  private createLink(sourcePath: string, linkPath: string): Promise<void> {
     const linkInfo = JSON.stringify({
       target: linkPath,
     });
@@ -327,8 +328,10 @@ class DeploymentMethod extends LinkingDeployment {
     // first before creating it again
     return fs
       .statAsync(sourcePath)
-      .catch({ code: "ENOENT" }, () =>
-        fs.statAsync(sourcePath + LNK_EXT).then(() => this.restoreLink(sourcePath + LNK_EXT)),
+      .catch(
+        only({ code: "ENOENT" }, () =>
+          fs.statAsync(sourcePath + LNK_EXT).then(() => this.restoreLink(sourcePath + LNK_EXT)),
+        ),
       )
       .then(() =>
         fs.writeFileAsync(sourcePath + LNK_EXT, linkInfo, {
@@ -347,23 +350,23 @@ class DeploymentMethod extends LinkingDeployment {
       .then(() => fs.renameAsync(sourcePath, linkPath));
   }
 
-  private restoreLink(linkPath: string): PromiseBB<void> {
+  private restoreLink(linkPath: string): Promise<void> {
     return fs.readFileAsync(linkPath, { encoding: "utf-8" }).then((data) => {
       try {
         const dat = JSON.parse(data);
         const outPath = linkPath.replace(this.mLnkExpression, "");
         return fs
           .renameAsync(dat.target, outPath)
-          .catch((err) =>
+          .catch((err: any) =>
             err.code === "ENOENT"
               ? // file was deleted. Well, the user is the boss...
-                PromiseBB.resolve()
+                Promise.resolve()
               : // how did we successfully deploy if this is on a different drive?
                 // if the game was moved the links shouldn't point to a valid location,
                 // if the staging folder was moved we should have purged
                 err.code === "EXDEV"
                 ? fs.moveAsync(dat.target, outPath)
-                : PromiseBB.reject(err),
+                : Promise.reject(err),
           )
           .then(() => fs.removeAsync(linkPath));
       } catch (err) {
@@ -371,7 +374,7 @@ class DeploymentMethod extends LinkingDeployment {
         const error: any = new Error("Invalid link");
         error.code = "ENOENT";
         error.path = linkPath;
-        return PromiseBB.reject(error);
+        return Promise.reject(error);
       }
     });
   }

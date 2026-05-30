@@ -1,5 +1,4 @@
 const path = require("path");
-const Promise = require("bluebird");
 const { fs, util } = require("@nexusmods/vortex-api");
 
 const { parseStringPromise } = require("xml2js");

@@ -1,7 +1,6 @@
 import * as path from "path";
 
 import { fs, log, types, util } from "@nexusmods/vortex-api";
-import Promise from "bluebird";
 
 import { ILoadOrder } from "./types";
 
@@ -38,7 +37,7 @@ function updateLoadOrder(tries: number = 3): Promise<void> {
         // this probably happens when poe2 is currently writing to that file,
         log("debug", "update load order", { tries });
         if (tries > 0) {
-          return Promise.delay(100).then(() => updateLoadOrder(tries - 1));
+          return util.delay(100).then(() => updateLoadOrder(tries - 1));
         } else {
           return err.message.indexOf("Unexpected token") !== -1
             ? Promise.reject(new util.DataInvalid("Invalid config file"))

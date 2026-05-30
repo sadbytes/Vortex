@@ -15,10 +15,6 @@
     "./package.json": "./package.json"
   },
   "dependencies": {
-    "bluebird": "catalog:",
     "fast-glob": "catalog:"
-  },
-  "devDependencies": {
-    "@types/bluebird": "catalog:"
   }
 }

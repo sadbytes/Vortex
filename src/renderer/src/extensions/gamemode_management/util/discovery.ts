@@ -1,7 +1,6 @@
 import * as path from "path";
 
 import { getErrorCode, getErrorMessageOrDefault, unknownToError } from "@vortex/shared";
-import Bluebird from "bluebird";
 import * as fsExtra from "fs-extra";
 import turbowalk from "turbowalk";
 
@@ -11,6 +10,7 @@ import type { IGame } from "../../../types/IGame";
 import { GameEntryNotFound } from "../../../types/IGameStore";
 import type { IGameStoreEntry } from "../../../types/IGameStoreEntry";
 import type { ITool } from "../../../types/ITool";
+import { map, mapSeries } from "../../../util/asyncpromise";
 import { ProcessCanceled, SetupError } from "../../../util/CustomErrors";
 import extractExeIcon from "../../../util/exeIcon";
 import * as fs from "../../../util/fs";
@@ -28,7 +28,6 @@ import { modPathsForGame } from "../../mod_management/selectors";
 import type { IDiscoveryResult } from "../types/IDiscoveryResult";
 import type { IToolStored } from "../types/IToolStored";
 import Progress from "./Progress";
-
 export type DiscoveredCB = (gameId: string, result: IDiscoveryResult) => void;
 export type DiscoveredToolCB = (gameId: string, result: IDiscoveredTool) => void;
 
@@ -42,14 +41,14 @@ export function quickDiscoveryTools(
   gameId: string,
   tools: ITool[],
   onDiscoveredTool: DiscoveredToolCB,
-): Bluebird<void> {
+): Promise<void> {
   if (tools === undefined) {
-    return Bluebird.resolve();
+    return Promise.resolve();
   }
 
-  return Bluebird.map(tools, (tool) => {
+  return map(tools, (tool) => {
     if (tool.queryPath === undefined) {
-      return Bluebird.resolve();
+      return Promise.resolve();
     }
 
     try {
@@ -71,10 +70,10 @@ export function quickDiscoveryTools(
             toolId: tool.id,
             toolName: tool.name,
           });
-          return Bluebird.resolve();
+          return Promise.resolve();
         }
       } else {
-        return (toolPath as Bluebird<string>)
+        return (toolPath as Promise<string>)
           .then((resolvedPath) => {
             if (resolvedPath) {
               return autoGenIcon(tool, resolvedPath, gameId).then(() => {
@@ -87,7 +86,7 @@ export function quickDiscoveryTools(
                 });
               });
             }
-            return Bluebird.resolve();
+            return Promise.resolve();
           })
           .catch((err) => {
             log("debug", "tool not found", {
@@ -105,7 +104,7 @@ export function quickDiscoveryTools(
         toolId: tool.id,
         toolName: tool.name,
       });
-      return Bluebird.resolve();
+      return Promise.resolve();
     }
   }).then(() => null);
 }
@@ -114,7 +113,7 @@ function updateManuallyConfigured(
   discoveredGames: { [id: string]: IDiscoveryResult },
   game: IGame,
   onDiscoveredGame: DiscoveredCB,
-): Bluebird<void> {
+): Promise<void> {
   if (
     discoveredGames[game.id]?.path !== undefined &&
     discoveredGames[game.id]?.store === undefined
@@ -143,17 +142,17 @@ function updateManuallyConfigured(
       store: discoveredGames[game.id]?.store,
     });
 
-    return Bluebird.resolve();
+    return Promise.resolve();
   }
 }
 
 function queryByArgs(
   discoveredGames: { [id: string]: IDiscoveryResult },
   game: IGame,
-): Bluebird<IGameStoreEntry> {
+): Promise<IGameStoreEntry> {
   return GameStoreHelper.find(game.queryArgs)
     .then((results) =>
-      Bluebird.all<IGameStoreEntry>(
+      Promise.all<IGameStoreEntry>(
         results.map((res) =>
           fs
             .statAsync(res.gamePath)
@@ -165,7 +164,7 @@ function queryByArgs(
     .then((results) => results.filter((res) => res !== undefined))
     .then((results) => {
       if (results.length === 0) {
-        return Bluebird.resolve(undefined);
+        return Promise.resolve(undefined);
       }
       const discoveredStore = discoveredGames[game.id]?.store;
       const prio = (entry: IGameStoreEntry) => {
@@ -177,12 +176,12 @@ function queryByArgs(
       };
 
       results = results.sort((lhs: IGameStoreEntry, rhs: IGameStoreEntry) => prio(lhs) - prio(rhs));
-      return Bluebird.resolve(results[0]);
+      return Promise.resolve(results[0]);
     });
 }
 
-function queryByCB(game: IGame): Bluebird<Partial<IGameStoreEntry>> {
-  let gamePath: string | Bluebird<string | IGameStoreEntry>;
+function queryByCB(game: IGame): Promise<Partial<IGameStoreEntry>> {
+  let gamePath: string | Promise<string | IGameStoreEntry>;
   let winePrefixPath: string | undefined;
 
   try {
@@ -195,12 +194,12 @@ function queryByCB(game: IGame): Bluebird<Partial<IGameStoreEntry>> {
       game: game.id,
       error: getErrorMessageOrDefault(err),
     });
-    return Bluebird.reject(err);
+    return Promise.reject(err);
   }
   const prom =
     typeof gamePath === "string"
-      ? Bluebird.resolve(gamePath)
-      : (gamePath ?? Bluebird.resolve(undefined));
+      ? Promise.resolve(gamePath)
+      : (gamePath ?? Promise.resolve(undefined));
 
   let store: string;
 
@@ -218,7 +217,7 @@ function queryByCB(game: IGame): Bluebird<Partial<IGameStoreEntry>> {
             return resolvedInfo;
           });
       } else if (resolvedInfo === undefined) {
-        return Bluebird.reject(new GameEntryNotFound(game.id, "unknown"));
+        return Promise.reject(new GameEntryNotFound(game.id, "unknown"));
       } else {
         store = resolvedInfo.gameStoreId;
         winePrefixPath = getWinePrefixPathForGameStoreEntry(resolvedInfo);
@@ -227,16 +226,16 @@ function queryByCB(game: IGame): Bluebird<Partial<IGameStoreEntry>> {
     })
     .then((resolvedPath) =>
       resolvedPath === undefined
-        ? Bluebird.resolve(undefined)
+        ? Promise.resolve(undefined)
         : fs
             .statAsync(resolvedPath)
             .then(() => ({ gamePath: resolvedPath, gameStoreId: store, winePrefixPath }))
-            .catch((err) => {
+            .catch((err: any) => {
               if (err.code === "ENOENT") {
                 log("warn", "rejecting game discovery, directory doesn't exist", resolvedPath);
-                return Bluebird.resolve(undefined);
+                return Promise.resolve(undefined);
               }
-              return Bluebird.reject(err);
+              return Promise.reject(err);
             }),
     );
 }
@@ -249,7 +248,7 @@ function handleDiscoveredGame(
   discoveredGames: { [id: string]: IDiscoveryResult },
   onDiscoveredGame: DiscoveredCB,
   onDiscoveredTool: DiscoveredToolCB,
-): Bluebird<string> {
+): Promise<string> {
   if (!truthy(resolvedPath)) {
     return undefined;
   }
@@ -267,7 +266,7 @@ function handleDiscoveredGame(
       discoverRelativeTools(game, resolvedPath, discoveredGames, onDiscoveredTool, normalize),
     )
     .then(() => game.id)
-    .catch((err) => {
+    .catch((err: any) => {
       onDiscoveredGame(game.id, undefined);
       if (err.message !== undefined) {
         log("debug", "game not found", {
@@ -294,18 +293,18 @@ export function quickDiscovery(
   discoveredGames: { [id: string]: IDiscoveryResult },
   onDiscoveredGame: DiscoveredCB,
   onDiscoveredTool: DiscoveredToolCB,
-): Bluebird<string[]> {
-  return Bluebird.all(
+): Promise<string[]> {
+  return Promise.all(
     knownGames.map((game) =>
       quickDiscoveryTools(game.id, game.supportedTools, onDiscoveredTool).then(() => {
         if (getSafe(discoveredGames, [game.id, "pathSetManually"], false)) {
           // don't override manually set game location but maybe update some settings
           return updateManuallyConfigured(discoveredGames, game, onDiscoveredGame).then(() =>
-            Bluebird.resolve(undefined),
+            Promise.resolve(undefined),
           );
         }
         log("debug", "discovering game", game.id);
-        let prom: Bluebird<string>;
+        let prom: Promise<string>;
 
         if (game.queryArgs !== undefined) {
           prom = queryByArgs(discoveredGames, game).then((result) => {
@@ -320,13 +319,13 @@ export function quickDiscovery(
                 onDiscoveredTool,
               );
             } else {
-              return Bluebird.resolve(undefined);
+              return Promise.resolve(undefined);
             }
           });
         } else if (game.queryPath !== undefined) {
           prom = queryByCB(game).then((result) => {
             if (result === undefined) {
-              return Bluebird.resolve(undefined);
+              return Promise.resolve(undefined);
             }
             return handleDiscoveredGame(
               game,
@@ -339,9 +338,9 @@ export function quickDiscovery(
             );
           });
         } else {
-          prom = Bluebird.resolve(undefined);
+          prom = Promise.resolve(undefined);
         }
-        return prom.catch((err) => {
+        return prom.catch((err: any) => {
           if (
             !(err instanceof GameEntryNotFound) &&
             !(err instanceof ProcessCanceled) &&
@@ -356,7 +355,7 @@ export function quickDiscovery(
             });
           }
           // don't escalate exception because a single game shouldn't break everything
-          return Bluebird.resolve(undefined);
+          return Promise.resolve(undefined);
         });
       }),
     ),
@@ -385,7 +384,7 @@ function walk(
   resultCB: (path: string) => void,
   progress: Progress,
   normalize: Normalize,
-): Bluebird<number> {
+): Promise<number> {
   // we can't actually know the progress percentage because for
   // that we'd need to search the disk twice, first to know the number of directories
   // just so we can show progress for the second run.
@@ -454,27 +453,27 @@ function walk(
   ).then(() => seenDirectories);
 }
 
-function verifyToolDir(tool: ITool, testPath: string): Bluebird<void> {
-  return Bluebird.mapSeries(
+function verifyToolDir(tool: ITool, testPath: string): Promise<void> {
+  return mapSeries(
     tool.requiredFiles,
     // our fs overload would try to acquire access to the directory if it's locked, which
     // is not something we want at this point because we don't even know yet if the user
     // wants to manage the game at all.
     (fileName: string) =>
       fsExtra.stat(path.join(testPath, fileName)).catch((err) => {
-        return Bluebird.reject(err);
+        return Promise.reject(err);
       }),
   ).then(() => undefined);
 }
 
-export function assertToolDir(tool: ITool, testPath: string): Bluebird<string> {
+export function assertToolDir(tool: ITool, testPath: string): Promise<string> {
   if (!truthy(testPath)) {
-    return Bluebird.resolve(undefined);
+    return Promise.resolve(undefined);
   }
 
   return verifyToolDir(tool, testPath)
     .then(() => testPath)
-    .catch((err) => {
+    .catch((err: any) => {
       if (err.code === "ENOENT") {
         log("warn", "game directory not valid", {
           game: tool.name,
@@ -493,7 +492,7 @@ export function assertToolDir(tool: ITool, testPath: string): Bluebird<string> {
           error: err.message,
         });
       }
-      return Bluebird.reject(err);
+      return Promise.reject(err);
     });
 }
 
@@ -505,7 +504,7 @@ export function discoverRelativeTools(
   discoveredGames: { [id: string]: IDiscoveryResult },
   onDiscoveredTool: DiscoveredToolCB,
   normalize: Normalize,
-): Bluebird<void> {
+): Promise<void> {
   log("info", "discovering relative tools", gamePath);
   const start = Date.now();
   const discoveredTools: { [id: string]: IToolStored } = getSafe(
@@ -521,7 +520,7 @@ export function discoverRelativeTools(
     );
 
   if (relativeTools.length === 0) {
-    return Bluebird.resolve();
+    return Promise.resolve();
   }
 
   const files: IFileEntry[] = relativeTools.reduce((prev: IFileEntry[], tool: ITool) => {
@@ -546,15 +545,15 @@ export function discoverRelativeTools(
   });
 }
 
-function autoGenIcon(application: ITool, exePath: string, gameId: string): Bluebird<void> {
+function autoGenIcon(application: ITool, exePath: string, gameId: string): Promise<void> {
   const iconPath = StarterInfo.toolIconRW(gameId, application.id);
   return application.logo === "auto"
     ? fs
-        .ensureDirWritableAsync(path.dirname(iconPath), () => Bluebird.resolve())
+        .ensureDirWritableAsync(path.dirname(iconPath), () => Promise.resolve())
         .then(() => fs.statAsync(iconPath).then(() => null))
         .catch(() => extractExeIcon(exePath, iconPath))
-        .catch((err) => log("warn", "failed to fetch exe icon", err.message))
-    : Bluebird.resolve();
+        .catch((err: any) => log("warn", "failed to fetch exe icon", err.message))
+    : Promise.resolve();
 }
 
 function testApplicationDirValid(
@@ -655,7 +654,7 @@ function onFile(
  * @param {string[]} searchPaths
  * @param {DiscoveredCB} onDiscoveredGame
  * @param {Progress} progressObj
- * @returns {Bluebird<any[]>}
+ * @returns {Promise<any[]>}
  */
 export function searchDiscovery(
   knownGames: IGame[],
@@ -665,10 +664,10 @@ export function searchDiscovery(
   onDiscoveredTool: DiscoveredToolCB,
   onError: (title: string, message: string) => void,
   progressCB: (idx: number, percent: number, label: string) => void,
-): Bluebird<any> {
+): Promise<any> {
   let totalRead = 0;
 
-  return Bluebird.map(
+  return map(
     // windows has separate cwds per drive. If we used c: as the search path it would not actually
     // search in the root of drive c but in whatever is currently the working directory on c, so
     // we have to append a backslash. Damn you windows...
@@ -724,16 +723,16 @@ export function searchDiscovery(
         .then(() => {
           log("info", "finished game search", { searchPath });
         })
-        .catch((err) => {
+        .catch((err: any) => {
           log("error", "game search failed", {
             error: err.message,
             searchPath,
           });
           return err.code === "ENOENT"
-            ? Bluebird.resolve(
+            ? Promise.resolve(
                 onError("A search path doesn't exist or is not connected", searchPath),
               )
-            : Bluebird.resolve(onError(err.message, searchPath));
+            : Promise.resolve(onError(err.message, searchPath));
         })
         .then(() => {
           progressObj.completed(searchPath);

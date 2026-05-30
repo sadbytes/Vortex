@@ -63,9 +63,9 @@ Spans are serialized to plain JSON (`SerializedSpan`) for IPC transfer.
 - Preload bridge: `src/preload/index.ts`
 - Main receiver: `src/main/telemetry/ipcHandler.ts`
 
-### Bluebird Context Propagation
+### Async Context Propagation
 
-`patchBluebirdContext()` in `src/renderer/extensions/telemetry/bluebird-patch.ts` installs a hook so OTel context propagates correctly through Bluebird promise chains.
+The renderer uses `ZoneContextManager` so OTel context propagates across native Promise, timer, and microtask boundaries without a Bluebird-specific patch.
 
 ## Crash Reporter Subprocess
 

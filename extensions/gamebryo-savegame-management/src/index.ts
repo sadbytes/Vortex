@@ -1,7 +1,6 @@
 import * as path from "path";
 
 import { actions, fs, log, selectors, types, util } from "@nexusmods/vortex-api";
-import Promise from "bluebird";
 import * as _ from "lodash";
 import * as Redux from "redux";
 import { IniFile } from "vortex-parse-ini";
@@ -405,34 +404,36 @@ function onRestorePlugins(api: types.IExtensionApi, savegame: ISavegame) {
     .then(() => {
       util.showSuccess(dispatch, "Restoring plugins complete", notificationId);
     })
-    .catch(MissingPluginsError, (err: MissingPluginsError) => {
-      let restorePlugins = true;
-      api
-        .showDialog(
-          "question",
-          t("Restore plugins"),
-          {
-            message: t("Some plugins are missing and can't be enabled.\n\n{{missingPlugins}}", {
-              replace: {
-                missingPlugins: err.missingPlugins.join("\n"),
+    .catch(
+      util.only(MissingPluginsError, (err: MissingPluginsError) => {
+        let restorePlugins = true;
+        api
+          .showDialog(
+            "question",
+            t("Restore plugins"),
+            {
+              message: t("Some plugins are missing and can't be enabled.\n\n{{missingPlugins}}", {
+                replace: {
+                  missingPlugins: err.missingPlugins.join("\n"),
+                },
+              }),
+              options: {
+                translated: true,
               },
-            }),
-            options: {
-              translated: true,
             },
-          },
-          [{ label: "Cancel" }, { label: "Continue" }],
-        )
-        .then((result: types.IDialogResult) => {
-          restorePlugins = result.action === "Continue";
-          if (restorePlugins) {
-            api.events.emit("set-plugin-list", savegame.attributes.plugins);
-            util.showSuccess(dispatch, "Restored plugins for savegame", notificationId);
-          } else {
-            api.dismissNotification(notificationId);
-          }
-        });
-    })
+            [{ label: "Cancel" }, { label: "Continue" }],
+          )
+          .then((result: types.IDialogResult) => {
+            restorePlugins = result.action === "Continue";
+            if (restorePlugins) {
+              api.events.emit("set-plugin-list", savegame.attributes.plugins);
+              util.showSuccess(dispatch, "Restored plugins for savegame", notificationId);
+            } else {
+              api.dismissNotification(notificationId);
+            }
+          });
+      }),
+    )
     .catch((err: Error) => {
       util.showError(dispatch, "Failed to restore plugins", err, {
         id: notificationId,
@@ -474,33 +475,34 @@ function onRemoveSavegames(api: types.IExtensionApi, profileId: string, savegame
 
   const sourceSavePath = path.join(gameProfiles, profilePath);
 
-  return Promise.map(savegameIds, (id) =>
-    !!id
-      ? Promise.map(saveFiles(currentProfile.gameId, id), (filePath) =>
-          fs
-            .removeAsync(path.join(sourceSavePath, filePath))
-            .catch(util.UserCanceled, () => undefined)
-            .catch((err) => {
-              // We're not checking for 'ENOENT' at this point given that
-              //  fs.removeAsync wrapper will resolve whenever these are
-              //  encountered.
-              if (err.code === "EPERM") {
-                util.showError(
-                  dispatch,
-                  "Failed to delete savegame",
-                  "The file is write protected.",
-                  { allowReport: false },
-                );
-                return Promise.resolve();
-              }
-              return Promise.reject(err);
-            })
-            .then(() => {
-              dispatch(removeSavegame(id));
-            }),
-        )
-      : Promise.reject(new Error("invalid savegame id")),
-  )
+  return util
+    .map(savegameIds, (id) =>
+      !!id
+        ? util.map(saveFiles(currentProfile.gameId, id), (filePath) =>
+            fs
+              .removeAsync(path.join(sourceSavePath, filePath))
+              .catch(util.only(util.UserCanceled, () => undefined))
+              .catch((err) => {
+                // We're not checking for 'ENOENT' at this point given that
+                //  fs.removeAsync wrapper will resolve whenever these are
+                //  encountered.
+                if (err.code === "EPERM") {
+                  util.showError(
+                    dispatch,
+                    "Failed to delete savegame",
+                    "The file is write protected.",
+                    { allowReport: false },
+                  );
+                  return Promise.resolve();
+                }
+                return Promise.reject(err);
+              })
+              .then(() => {
+                dispatch(removeSavegame(id));
+              }),
+          )
+        : Promise.reject(new Error("invalid savegame id")),
+    )
     .then(() => updateSaves(api.store, sourceSavePath))
     .catch((err) => {
       util.showError(

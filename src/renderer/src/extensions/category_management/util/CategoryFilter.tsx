@@ -1,4 +1,3 @@
-import PromiseBB from "bluebird";
 import update from "immutability-helper";
 import * as _ from "lodash";
 import * as React from "react";
@@ -7,6 +6,7 @@ import { Creatable } from "react-select";
 import { connect } from "../../../controls/ComponentEx";
 import type { IDownload, IState } from "../../../types/IState";
 import type { IFilterProps, ITableFilter } from "../../../types/ITableAttribute";
+import { map } from "../../../util/asyncpromise";
 import { getSafe } from "../../../util/storeHelper";
 import { truthy } from "../../../util/util";
 import getDownloadGames from "../../download_management/util/getDownloadGames";
@@ -14,7 +14,6 @@ import type { IMod } from "../../mod_management/types/IMod";
 import filterModInfo from "../../mod_management/util/filterModInfo";
 import { activeGameId } from "../../profile_management/selectors";
 import type { ICategoryDictionary } from "../types/ICategoryDictionary";
-
 interface IConnectedProps {
   gameId: string;
   categories: ICategoryDictionary;
@@ -179,7 +178,7 @@ class CategoryFilterComponent extends React.Component<IProps, IComponentState> {
       customOption = { label: customFilter.slice(1), value: customFilter };
     }
 
-    PromiseBB.map(filtered, (archiveId) =>
+    map(filtered, (archiveId) =>
       filterModInfo({ download: props.downloads[archiveId] }, undefined).then((info) => {
         if (info.category !== undefined) {
           archiveCategories[archiveId] = info.category;

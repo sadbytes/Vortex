@@ -2,7 +2,6 @@ import path from "path";
 
 import { fs, log, types, selectors, util } from "@nexusmods/vortex-api";
 /* eslint-disable */
-import Bluebird from "bluebird";
 import turbowalk, { IEntry, IWalkOptions } from "turbowalk";
 
 import {
@@ -384,8 +383,8 @@ export function suppressEventHandlers(api: types.IExtensionApi) {
   );
 }
 
-export function toBlue<T>(func: (...args: any[]) => Promise<T>): (...args: any[]) => Bluebird<T> {
-  return (...args: any[]) => Bluebird.resolve(func(...args));
+export function toBlue<T>(func: (...args: any[]) => Promise<T>): (...args: any[]) => Promise<T> {
+  return (...args: any[]) => Promise.resolve(func(...args));
 }
 
 export async function fileExists(filePath: string): Promise<boolean> {

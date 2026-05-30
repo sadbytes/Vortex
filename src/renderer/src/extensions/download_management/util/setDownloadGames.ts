@@ -110,7 +110,9 @@ async function moveDownload(
   try {
     const oStat = await fs
       .statAsync(oldPath)
-      .catch((err) => (err.code === "ENOENT" ? Promise.resolve(undefined) : Promise.reject(err)));
+      .catch((err: any) =>
+        err.code === "ENOENT" ? Promise.resolve(undefined) : Promise.reject(err),
+      );
     const nStat = await fs.statAsync(newPath);
     if (!!oStat && oStat.ino === nStat.ino) {
       const err = new ProcessCanceled("source same as destination");
@@ -125,7 +127,7 @@ async function moveDownload(
   }
   return fs
     .moveRenameAsync(source, dest)
-    .catch((err) => (err.code === "ENOENT" ? Promise.resolve(dest) : Promise.reject(err)));
+    .catch((err: any) => (err.code === "ENOENT" ? Promise.resolve(dest) : Promise.reject(err)));
 }
 
 export default setDownloadGames;

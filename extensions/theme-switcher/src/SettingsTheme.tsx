@@ -1,5 +1,4 @@
 import { actions, ComponentEx, log, Toggle, tooltip, types, util } from "@nexusmods/vortex-api";
-import Bluebird from "bluebird";
 import * as React from "react";
 import {
   Alert,
@@ -42,7 +41,7 @@ interface IActionProps {
     title: string,
     content: types.IDialogContent,
     actions: types.DialogActions,
-  ) => Bluebird<types.IDialogResult>;
+  ) => Promise<types.IDialogResult>;
   onShowError: (title: string, details: any) => void;
   onSetUseModernLayout: (useModern: boolean) => void;
 }

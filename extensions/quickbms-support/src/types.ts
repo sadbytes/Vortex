@@ -1,5 +1,3 @@
-import Promise from "bluebird";
-
 export class QuickBMSError extends Error {
   private mErrorLines: string;
   constructor(message: string, stdErrLines: string[]) {

@@ -1,5 +1,4 @@
 import { ComponentEx, util } from "@nexusmods/vortex-api";
-import Promise from "bluebird";
 import * as React from "react";
 import { ListGroup } from "react-bootstrap";
 import {

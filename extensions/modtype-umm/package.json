@@ -17,7 +17,6 @@
     "@types/react": "catalog:",
     "@types/redux": "catalog:",
     "@types/semver": "catalog:",
-    "bluebird": "catalog:",
     "copyfiles": "catalog:",
     "i18next": "catalog:",
     "react": "catalog:",

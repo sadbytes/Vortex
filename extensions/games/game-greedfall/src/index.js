@@ -1,4 +1,3 @@
-const Promise = require("bluebird");
 const path = require("path");
 const { fs, selectors, types, util } = require("@nexusmods/vortex-api");
 
@@ -105,13 +104,15 @@ function main(context) {
       const modDeployPath = modPath(discovery);
 
       const now = new Date();
-      return Promise.map(deployment[""], (file) =>
-        fs.utimesAsync(path.join(modDeployPath, file.relPath), now, now),
-      ).catch((err) =>
-        context.api.showErrorNotification("Failed to change file access/modified time", err, {
-          allowReport: false,
-        }),
-      );
+      return util
+        .map(deployment[""], (file) =>
+          fs.utimesAsync(path.join(modDeployPath, file.relPath), now, now),
+        )
+        .catch((err) =>
+          context.api.showErrorNotification("Failed to change file access/modified time", err, {
+            allowReport: false,
+          }),
+        );
     });
   });
 

@@ -1,5 +1,4 @@
 import { types, selectors } from "@nexusmods/vortex-api";
-import Promise from "bluebird";
 import * as _ from "lodash";
 import * as React from "react";
 import { connect } from "react-redux";

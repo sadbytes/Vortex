@@ -10,9 +10,7 @@
   "author": "Black Tree Gaming Ltd.",
   "license": "GPL-3.0",
   "devDependencies": {
-    "@types/bluebird": "catalog:",
     "@types/node": "catalog:",
-    "bluebird": "catalog:",
     "copyfiles": "catalog:",
     "redux": "catalog:",
     "turbowalk": "workspace:*",

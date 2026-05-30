@@ -1,7 +1,6 @@
 import * as path from "path";
 
 import { actions, fs, log, selectors, types, util } from "@nexusmods/vortex-api";
-import Bluebird from "bluebird";
 
 import { IDataArchive, IGameData, IIncompatibleArchive } from "./types";
 
@@ -79,11 +78,11 @@ function main(context: types.IExtensionContext) {
   context.registerTest(
     "incompatible-mod-archives",
     "plugins-changed",
-    (): Bluebird<types.ITestResult> => runTest(context),
+    (): Promise<types.ITestResult> => runTest(context),
   );
 
   // context.registerTest('incompatible-mod-archives', 'loot-info-updated',
-  //   (): Bluebird<types.ITestResult> => runTest(context));
+  //   (): Promise<types.ITestResult> => runTest(context));
 
   return true;
 }
@@ -94,12 +93,12 @@ async function checkForErrors(api: types.IExtensionApi, pluginsObj: any) {
   const activeGameId = selectors.activeGameId(state);
   const gameData: IGameData = archiveData.find((g) => g.gameId === activeGameId);
   if (!gameData) {
-    return Bluebird.resolve(undefined);
+    return Promise.resolve(undefined);
   }
 
   // Get the plugins for the current game.
   if (!pluginsObj || !Object.keys(pluginsObj)) {
-    return Bluebird.resolve(undefined);
+    return Promise.resolve(undefined);
   }
 
   const plugins = Object.keys(pluginsObj)
@@ -122,7 +121,7 @@ async function checkForErrors(api: types.IExtensionApi, pluginsObj: any) {
 
   const dataFolder = discovery ? path.join(discovery, "data") : undefined;
   if (dataFolder === undefined) {
-    return Bluebird.resolve(undefined);
+    return Promise.resolve(undefined);
   }
 
   const normalize = (fileName: string) => {
@@ -140,7 +139,7 @@ async function checkForErrors(api: types.IExtensionApi, pluginsObj: any) {
       return Promise.reject(err);
     });
     if (dataFiles === undefined) {
-      return Bluebird.resolve(undefined);
+      return Promise.resolve(undefined);
     }
     const dataArchives = dataFiles.filter((f) => [".ba2", ".bsa"].includes(path.extname(f)));
     const archivesToCheck: IDataArchive[] = archiveLoaders.reduce((accum, plugin) => {
@@ -154,7 +153,7 @@ async function checkForErrors(api: types.IExtensionApi, pluginsObj: any) {
 
     // If there's nothing to check, we can exit here.
     if (!archivesToCheck.length) {
-      return Bluebird.resolve(undefined);
+      return Promise.resolve(undefined);
     }
 
     let pos = 0;
@@ -200,11 +199,11 @@ async function checkForErrors(api: types.IExtensionApi, pluginsObj: any) {
 
     api.dismissNotification(checkNotifId);
 
-    return issues?.length > 0 ? genTestResult(api, issues, gameData) : Bluebird.resolve(undefined);
+    return issues?.length > 0 ? genTestResult(api, issues, gameData) : Promise.resolve(undefined);
   } catch (err) {
     api.dismissNotification(checkNotifId);
     api.showErrorNotification("Error checking for archive errors", err);
-    return Bluebird.resolve(undefined);
+    return Promise.resolve(undefined);
   }
 }
 
@@ -212,7 +211,7 @@ function genTestResult(
   api: types.IExtensionApi,
   issues: IIncompatibleArchive[],
   gameData: IGameData,
-): Bluebird<types.ITestResult> {
+): Promise<types.ITestResult> {
   const t = api.translate;
   const thisGame = gameData.gameName;
   const groupedErrors = issues.reduce(
@@ -258,7 +257,7 @@ function genTestResult(
     );
   });
 
-  return Bluebird.resolve({
+  return Promise.resolve({
     description: {
       short: "Incompatible mod archive(s)",
       long:

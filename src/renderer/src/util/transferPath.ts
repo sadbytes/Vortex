@@ -2,12 +2,12 @@ import * as nodeFs from "fs";
 import * as path from "path";
 
 import { getErrorCode, isErrorWithSystemCode, unknownToError } from "@vortex/shared";
-import PromiseBB from "bluebird";
 import type { IEntry } from "turbowalk";
 import turbowalk from "turbowalk";
 
 import { DOWNLOADS_DIR_TAG } from "../extensions/download_management/util/downloadDirectory";
 import { STAGING_DIR_TAG } from "../extensions/mod_management/stagingDirectory";
+import { each, map, only } from "./asyncpromise";
 import {
   CleanupFailedException,
   InsufficientDiskSpace,
@@ -22,7 +22,6 @@ import getNormalizeFunc from "./getNormalizeFunc";
 import { log } from "./log";
 import * as winapi from "./nativeModules/winapiBindings";
 import { isChildPath } from "./util";
-
 const MIN_DISK_SPACE_OFFSET = 512 * 1024 * 1024;
 
 /**
@@ -35,9 +34,9 @@ const MIN_DISK_SPACE_OFFSET = 512 * 1024 * 1024;
  * @param source The current source folder.
  * @param destination The proposed destination folder.
  */
-export function testPathTransfer(source: string, destination: string): PromiseBB<void> {
+export function testPathTransfer(source: string, destination: string): Promise<void> {
   if (process.platform !== "win32") {
-    return PromiseBB.reject(new UnsupportedOperatingSystem());
+    return Promise.reject(new UnsupportedOperatingSystem());
   }
 
   let destinationRoot: string;
@@ -46,20 +45,20 @@ export function testPathTransfer(source: string, destination: string): PromiseBB
   } catch (err) {
     if (isErrorWithSystemCode(err)) {
       if (err.systemCode === 2) {
-        return PromiseBB.reject(new NotFound(destination));
+        return Promise.reject(new NotFound(destination));
       }
     }
 
-    return PromiseBB.reject(err);
+    return Promise.reject(err);
   }
 
-  const isOnSameVolume = (): PromiseBB<boolean> => {
-    return PromiseBB.all([fs.statAsync(source), fs.statAsync(destinationRoot)]).then(
+  const isOnSameVolume = (): Promise<boolean> => {
+    return Promise.all([fs.statAsync(source), fs.statAsync(destinationRoot)]).then(
       (stats) => stats[0].dev === stats[1].dev,
     );
   };
 
-  const calculate = (filePath: string): PromiseBB<number> => {
+  const calculate = (filePath: string): Promise<number> => {
     let total = 0;
     return turbowalk(
       filePath,
@@ -68,7 +67,7 @@ export function testPathTransfer(source: string, destination: string): PromiseBB
         total += files.reduce((lhs, rhs) => lhs + rhs.size, 0);
       },
       { skipHidden: false },
-    ).then(() => PromiseBB.resolve(total));
+    ).then(() => Promise.resolve(total));
   };
 
   let totalNeededBytes = 0;
@@ -81,30 +80,30 @@ export function testPathTransfer(source: string, destination: string): PromiseBB
       //  possibly a faulty HDD that was replaced.
       //  For that reason, we're going to skip disk calculations entirely.
       log("warn", "Transfer disk space test failed - missing source directory", err);
-      return PromiseBB.reject(new ProcessCanceled("Missing source directory"));
+      return Promise.reject(new ProcessCanceled("Missing source directory"));
     })
     .then(() => isOnSameVolume())
     .then((res) =>
       res
-        ? PromiseBB.reject(new ProcessCanceled("Disk space calculations are unnecessary."))
+        ? Promise.reject(new ProcessCanceled("Disk space calculations are unnecessary."))
         : calculate(source),
     )
     .then((totalSize) => {
       totalNeededBytes = totalSize;
       try {
         const stats = nodeFs.statfsSync(destinationRoot);
-        return PromiseBB.resolve({ free: stats.bavail * stats.bsize });
+        return Promise.resolve({ free: stats.bavail * stats.bsize });
       } catch (err) {
         // don't report an error just because this check failed
-        return PromiseBB.resolve({ free: Number.MAX_VALUE });
+        return Promise.resolve({ free: Number.MAX_VALUE });
       }
     })
     .then((res) =>
       totalNeededBytes < res.free - MIN_DISK_SPACE_OFFSET
-        ? PromiseBB.resolve()
-        : PromiseBB.reject(new InsufficientDiskSpace(destinationRoot)),
+        ? Promise.resolve()
+        : Promise.reject(new InsufficientDiskSpace(destinationRoot)),
     )
-    .catch(ProcessCanceled, () => PromiseBB.resolve());
+    .catch(only(ProcessCanceled, () => Promise.resolve()));
 }
 
 export type ProgressCallback = (from: string, to: string, percentage: number) => void;
@@ -121,7 +120,7 @@ export function transferPath(
   source: string,
   dest: string,
   progress: ProgressCallback,
-): PromiseBB<void> {
+): Promise<void> {
   let func = fs.copyAsync;
 
   let completed: number = 0;
@@ -129,7 +128,7 @@ export function transferPath(
   let lastPerc: number = 0;
   let lastProgress: number = 0;
 
-  let copyPromise = PromiseBB.resolve();
+  let copyPromise = Promise.resolve();
 
   // Used to keep track of leftover empty directories when
   //  the user moves the directory to a nested one
@@ -152,20 +151,18 @@ export function transferPath(
     .then((norm) => {
       normalize = norm;
       if (norm(dest) === norm(source)) {
-        return PromiseBB.reject(new ProcessCanceled("Source and Destination are the same"));
+        return Promise.reject(new ProcessCanceled("Source and Destination are the same"));
       }
       moveDown = isChildPath(dest, source, norm);
     })
     .then(() =>
-      PromiseBB.join(
-        fs.statAsync(source),
-        fs.statAsync(dest),
-        (statOld: fs.Stats, statNew: fs.Stats) => PromiseBB.resolve(statOld.dev === statNew.dev),
+      Promise.all([fs.statAsync(source), fs.statAsync(dest)]).then(
+        ([statOld, statNew]: [fs.Stats, fs.Stats]) => statOld.dev === statNew.dev,
       ),
     )
     .then((sameVolume: boolean) => {
       func = sameVolume ? linkFile : fs.copyAsync;
-      return PromiseBB.resolve();
+      return Promise.resolve();
     })
     .then(() =>
       turbowalk(
@@ -186,39 +183,41 @@ export function transferPath(
           count += files.length;
 
           copyPromise = isCancelled
-            ? PromiseBB.resolve()
+            ? Promise.resolve()
             : copyPromise
                 .then(() =>
-                  PromiseBB.each(directories.sort(longestFirst), (entry) => {
+                  each(directories.sort(longestFirst), (entry) => {
                     if (moveDown && isChildPath(dest, entry.filePath)) {
                       // this catches the case where we transfer .../mods to .../mods/foo/bar
                       // and we come across the path .../mods/foo. Wouldn't want to try to remove
                       // that, do we?
-                      return PromiseBB.resolve();
+                      return Promise.resolve();
                     }
                     removableDirectories.push(entry.filePath);
                     const destPath = path.join(dest, path.relative(source, entry.filePath));
                     return isCancelled
-                      ? PromiseBB.reject(new UserCanceled())
+                      ? Promise.reject(new UserCanceled())
                       : fs
                           .ensureDirWritableAsync(destPath)
                           .catch((err) =>
                             getErrorCode(err) === "EEXIST"
-                              ? PromiseBB.resolve()
-                              : PromiseBB.reject(err),
+                              ? Promise.resolve()
+                              : Promise.reject(err),
                           );
                   }).then(() => {}),
                 )
                 .then(() =>
-                  PromiseBB.map(files, (entry) => {
+                  map(files, (entry) => {
                     const sourcePath = entry.filePath;
                     const destPath = path.join(dest, path.relative(source, entry.filePath));
 
                     return func(sourcePath, destPath, { showDialogCallback })
-                      .catch(UserCanceled, () => {
-                        isCancelled = true;
-                        copyPromise = PromiseBB.resolve();
-                      })
+                      .catch(
+                        only(UserCanceled, () => {
+                          isCancelled = true;
+                          copyPromise = Promise.resolve();
+                        }),
+                      )
                       .catch((err) => {
                         // EXDEV implies we tried to rename when source and destination are
                         //  not in fact on the same volume. This is what comparing the stat.dev
@@ -234,9 +233,9 @@ export function transferPath(
                             showDialogCallback,
                           });
                         } else if (code === "ENOENT") {
-                          return PromiseBB.resolve();
+                          return Promise.resolve();
                         } else {
-                          return PromiseBB.reject(err);
+                          return Promise.reject(err);
                         }
                       })
                       .then(() => {
@@ -260,7 +259,7 @@ export function transferPath(
     )
     .then(() =>
       copyPromise.then(() =>
-        exception !== undefined ? PromiseBB.reject(exception) : PromiseBB.resolve(),
+        exception !== undefined ? Promise.reject(exception) : Promise.resolve(),
       ),
     )
     .then(() => {
@@ -283,7 +282,7 @@ export function transferPath(
           err.stack !== undefined ? err.stack : err,
         );
 
-        return PromiseBB.reject(new CleanupFailedException(err));
+        return Promise.reject(new CleanupFailedException(err));
       });
     });
 }
@@ -296,7 +295,7 @@ export function transferPath(
  *  https://github.com/Nexus-Mods/Vortex/issues/6769
  * @param dirPath
  */
-export function cleanFailedTransfer(dirPath: string): PromiseBB<void> {
+export function cleanFailedTransfer(dirPath: string): Promise<void> {
   let files: IEntry[] = [];
   return turbowalk(
     dirPath,
@@ -308,12 +307,12 @@ export function cleanFailedTransfer(dirPath: string): PromiseBB<void> {
     .catch((err) => {
       const code = getErrorCode(err);
       return code && ["ENOENT", "ENOTFOUND"].includes(code)
-        ? PromiseBB.resolve()
-        : PromiseBB.reject(err);
+        ? Promise.resolve()
+        : Promise.reject(err);
     })
     .then(() => {
       files = files.sort((lhs, rhs) => rhs.filePath.length - lhs.filePath.length);
-      return PromiseBB.each(files, (file) => fs.removeAsync(file.filePath));
+      return each(files, (file) => fs.removeAsync(file.filePath));
     })
     .then(() => fs.removeAsync(dirPath));
 }
@@ -321,50 +320,48 @@ export function cleanFailedTransfer(dirPath: string): PromiseBB<void> {
 function removeFolderTags(sourceDir: string) {
   // Attempt to remove the folder tag. (either staging folder or downloads tag)
   //  This should only be called when the folder is moved down a layer.
-  const tagFileExists = (filePath: string): PromiseBB<boolean> => {
+  const tagFileExists = (filePath: string): Promise<boolean> => {
     return fs
       .statAsync(filePath)
       .then(() => true)
       .catch(() => false);
   };
 
-  const removeTag = (filePath: string): PromiseBB<void> => {
+  const removeTag = (filePath: string): Promise<void> => {
     return tagFileExists(filePath).then((exists) =>
       exists
         ? fs.removeAsync(filePath).catch((err) => {
             log("error", "Unable to remove directory tag", err);
             return getErrorCode(err) === "ENOENT"
               ? // Tag file is gone ? no problem.
-                PromiseBB.resolve()
-              : PromiseBB.reject(err);
+                Promise.resolve()
+              : Promise.reject(err);
           })
-        : PromiseBB.resolve(),
+        : Promise.resolve(),
     );
   };
 
   const stagingFolderTag = path.join(sourceDir, STAGING_DIR_TAG);
   const downloadsTag = path.join(sourceDir, DOWNLOADS_DIR_TAG);
-  return PromiseBB.all([removeTag(stagingFolderTag), removeTag(downloadsTag)]);
+  return Promise.all([removeTag(stagingFolderTag), removeTag(downloadsTag)]);
 }
 
-function removeOldDirectories(directories: string[]): PromiseBB<void> {
+function removeOldDirectories(directories: string[]): Promise<void> {
   const longestFirst = (lhs, rhs) => rhs.length - lhs.length;
-  return PromiseBB.each(directories.sort(longestFirst), (dir) =>
+  return each(directories.sort(longestFirst), (dir) =>
     fs.removeAsync(dir).catch((err) => {
       return getErrorCode(err) === "ENOENT"
         ? // Directory missing ? odd but lets keep going.
-          PromiseBB.resolve()
-        : PromiseBB.reject(err);
+          Promise.resolve()
+        : Promise.reject(err);
     }),
-  ).then(() => PromiseBB.resolve());
+  ).then(() => Promise.resolve());
 }
 
-function linkFile(source: string, dest: string, options?: fs.ILinkFileOptions): PromiseBB<void> {
+function linkFile(source: string, dest: string, options?: fs.ILinkFileOptions): Promise<void> {
   return fs.ensureDirAsync(path.dirname(dest)).then(() => {
     return fs
       .linkAsync(source, dest, options)
-      .catch((err) =>
-        getErrorCode(err) !== "EEXIST" ? PromiseBB.reject(err) : PromiseBB.resolve(),
-      );
+      .catch((err) => (getErrorCode(err) !== "EEXIST" ? Promise.reject(err) : Promise.resolve()));
   });
 }

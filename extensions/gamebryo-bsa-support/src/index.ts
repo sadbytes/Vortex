@@ -2,7 +2,6 @@ import * as path from "path";
 import { PassThrough } from "stream";
 
 import { fs, types, util } from "@nexusmods/vortex-api";
-import PromiseBB from "bluebird";
 import { BSAFile, BSAFolder, BSArchive, createBSA, loadBSA } from "bsatk";
 import { dir as tmpDir } from "tmp";
 
@@ -12,17 +11,17 @@ class BSAHandler implements types.IArchiveHandler {
     this.mBSA = bsa;
   }
 
-  public readDir(archPath: string): PromiseBB<string[]> {
-    return PromiseBB.resolve(this.readDirImpl(this.mBSA.root, archPath.split(path.sep), 0));
+  public readDir(archPath: string): Promise<string[]> {
+    return Promise.resolve(this.readDirImpl(this.mBSA.root, archPath.split(path.sep), 0));
   }
 
-  public extractFile(filePath: string, outputPath: string): PromiseBB<void> {
+  public extractFile(filePath: string, outputPath: string): Promise<void> {
     const file: BSAFile = this.getFileImpl(this.mBSA.root, filePath.split(path.sep), 0);
     if (file === undefined) {
-      return PromiseBB.reject(new Error("file not found " + filePath));
+      return Promise.reject(new Error("file not found " + filePath));
     }
 
-    return new PromiseBB<void>((resolve, reject) => {
+    return new Promise<void>((resolve, reject) => {
       this.mBSA.extractFile(file, outputPath, (readErr) => {
         if (readErr !== null) {
           reject(readErr);
@@ -32,8 +31,8 @@ class BSAHandler implements types.IArchiveHandler {
     });
   }
 
-  public extractAll(outputPath: string): PromiseBB<void> {
-    return new PromiseBB<void>((resolve, reject) => {
+  public extractAll(outputPath: string): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
       this.mBSA.extractAll(outputPath, (readErr) => {
         if (readErr !== null) {
           reject(readErr);
@@ -79,7 +78,7 @@ class BSAHandler implements types.IArchiveHandler {
     return pass;
   }
 
-  public addFile(filePath: string, sourcePath: string): PromiseBB<void> {
+  public addFile(filePath: string, sourcePath: string): Promise<void> {
     const segments = filePath.split(path.sep);
     let current = this.mBSA.root;
     segments.forEach((segment, idx) => {
@@ -89,17 +88,17 @@ class BSAHandler implements types.IArchiveHandler {
         current = this.getSubfolder(current, segment);
       }
     });
-    return PromiseBB.resolve();
+    return Promise.resolve();
   }
 
-  public write(): PromiseBB<void> {
+  public write(): Promise<void> {
     this.mBSA.write();
-    return PromiseBB.resolve();
+    return Promise.resolve();
   }
 
-  public closeArchive(): PromiseBB<void> {
+  public closeArchive(): Promise<void> {
     this.mBSA.closeArchive();
-    return PromiseBB.resolve();
+    return Promise.resolve();
   }
 
   private getSubfolder(base: BSAFolder, name: string): BSAFolder {
@@ -173,8 +172,8 @@ class BSAHandler implements types.IArchiveHandler {
 function createBSAHandler(
   fileName: string,
   options: types.IArchiveOptions,
-): PromiseBB<types.IArchiveHandler> {
-  return PromiseBB.resolve(
+): Promise<types.IArchiveHandler> {
+  return Promise.resolve(
     (async () =>
       options.create
         ? util.toPromise((cb) => createBSA(fileName, cb))

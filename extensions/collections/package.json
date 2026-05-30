@@ -21,7 +21,6 @@
     "@types/react-dom": "catalog:",
     "@types/react-redux": "catalog:",
     "@types/redux": "catalog:",
-    "bluebird": "catalog:",
     "copyfiles": "catalog:",
     "crc-32": "catalog:",
     "happy-dom": "catalog:",

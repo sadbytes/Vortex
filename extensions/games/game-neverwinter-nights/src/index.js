@@ -1,4 +1,3 @@
-const Promise = require("bluebird");
 const path = require("path");
 const winapi = require("winapi-bindings");
 const { fs, util } = require("@nexusmods/vortex-api");
@@ -163,11 +162,13 @@ function prepareForModding(discovery, context) {
           return candidates.length > 1 ? raiseNotif(candidates) : Promise.resolve();
         });
 
-  return Promise.map(Object.keys(MOD_EXT_DESTINATION), (ext) =>
-    fs.ensureDirAsync(
-      path.join(context === undefined ? discovery.path : modPathEE(), MOD_EXT_DESTINATION[ext]),
-    ),
-  ).then(() => testModsPath());
+  return util
+    .map(Object.keys(MOD_EXT_DESTINATION), (ext) =>
+      fs.ensureDirAsync(
+        path.join(context === undefined ? discovery.path : modPathEE(), MOD_EXT_DESTINATION[ext]),
+      ),
+    )
+    .then(() => testModsPath());
 }
 
 function main(context) {

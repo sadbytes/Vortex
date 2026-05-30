@@ -1,5 +1,4 @@
 import { getErrorMessageOrDefault } from "@vortex/shared";
-import Bluebird from "bluebird";
 import type { Action } from "redux";
 
 import type { IExtensionApi, ILookupResult } from "../../../types/IExtensionContext";
@@ -115,7 +114,7 @@ class MetadataLookupQueue {
   }
 }
 
-function queryInfoInternal(api: IExtensionApi, dlId: string, ignoreCache: boolean): Bluebird<void> {
+function queryInfoInternal(api: IExtensionApi, dlId: string, ignoreCache: boolean): Promise<void> {
   const state: IState = api.store.getState();
 
   const actions: Action[] = [];
@@ -125,19 +124,19 @@ function queryInfoInternal(api: IExtensionApi, dlId: string, ignoreCache: boolea
   const dl = state.persistent.downloads.files[dlId];
   if (dl === undefined) {
     log("warn", "download no longer exists", dlId);
-    return Bluebird.resolve();
+    return Promise.resolve();
   }
 
   if (!dl.fileMD5 || dl.size === 0) {
     log("debug", "skipping metadata lookup - no MD5 hash available", { dlId });
-    return Bluebird.resolve();
+    return Promise.resolve();
   }
 
   const gameMode = activeGameId(state);
   const gameId = Array.isArray(dl.game) ? dl.game[0] : dl.game;
   if (dl.localPath === undefined) {
     // almost certainly dl.localPath is undefined with a bugged download
-    return Bluebird.resolve();
+    return Promise.resolve();
   }
   log("info", "lookup mod meta info", { dlId, md5: dl.fileMD5 });
 
@@ -152,8 +151,9 @@ function queryInfoInternal(api: IExtensionApi, dlId: string, ignoreCache: boolea
       },
       ignoreCache,
     )
-    .tap(() => {
+    .then((result) => {
       log("info", "metadata lookup completed", { md5: dl.fileMD5 });
+      return result;
     });
 
   // const timeoutMs = 2000;
@@ -219,7 +219,7 @@ function queryInfoInternal(api: IExtensionApi, dlId: string, ignoreCache: boolea
           // Pass extra parameter to indicate this is from metadata lookup
           return api
             .emitAndAwait("set-download-games", dlId, [metaGameId, gameId], true)
-            .catch((err) => {
+            .catch((err: any) => {
               log("warn", "failed to set download games", {
                 dlId,
                 gameId,
@@ -229,10 +229,10 @@ function queryInfoInternal(api: IExtensionApi, dlId: string, ignoreCache: boolea
             });
         }
       } else {
-        return Bluebird.resolve();
+        return Promise.resolve();
       }
     })
-    .catch((err) => {
+    .catch((err: any) => {
       log("warn", "failed to look up mod meta info", { message: err.message });
     })
     .finally(() => {

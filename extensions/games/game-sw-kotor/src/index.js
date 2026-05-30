@@ -6,8 +6,6 @@
 //
 //  We will let the default installer to take over when the override structure
 //  isn't detected.
-
-const Promise = require("bluebird");
 const path = require("path");
 const winapi = require("winapi-bindings");
 const { fs, selectors, util } = require("@nexusmods/vortex-api");

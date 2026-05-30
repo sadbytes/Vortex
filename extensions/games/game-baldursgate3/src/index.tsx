@@ -11,7 +11,6 @@ import { fs, selectors, types, util } from "@nexusmods/vortex-api";
  * Removing files from bundled plugins without stubbing the extension
  *  can potentially break the extension on the user's end.
  */
-import Bluebird from "bluebird";
 import { getProductVersionLocalized } from "exe-version";
 import * as _ from "lodash";
 import * as React from "react";
@@ -115,7 +114,7 @@ async function prepareForModding(api: types.IExtensionApi, discovery) {
 
   return fs
     .statAsync(mp)
-    .catch(() => fs.ensureDirWritableAsync(mp, () => Bluebird.resolve() as any))
+    .catch(() => fs.ensureDirWritableAsync(mp, () => Promise.resolve() as any))
     .finally(() => ensureGlobalProfile(api, discovery));
 }
 

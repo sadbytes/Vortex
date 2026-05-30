@@ -17,7 +17,6 @@
     "@types/redux": "catalog:",
     "@types/redux-thunk": "catalog:",
     "@types/tmp": "catalog:",
-    "bluebird": "catalog:",
     "copyfiles": "catalog:",
     "cross-fetch": "catalog:",
     "fuzzball": "catalog:",

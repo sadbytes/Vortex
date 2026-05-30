@@ -4602,55 +4602,6 @@
   },
   {
     "type": "file",
-    "url": "https://registry.yarnpkg.com/@types/bluebird/-/bluebird-3.5.20.tgz#f6363172add6f4eabb8cada53ca9af2781e8d6a1",
-    "sha256": "507a888d9b3cc17df903d2e4f2faad44219f6291b7623f46b039252558410951",
-    "dest-filename": "@types-bluebird-3.5.20.tgz",
-    "dest": "flatpak-node/yarn-mirror"
-  },
-  {
-    "type": "file",
-    "url": "https://registry.yarnpkg.com/@types/bluebird/-/bluebird-3.5.20.tgz#f6363172add6f4eabb8cada53ca9af2781e8d6a1",
-    "sha512": "5a4e35315745f9c1c17d55e3fee7d41c978edc194842bd4c71b1d900d12b33291a0967834996c7e5eac68cd070dbfdd4951752c596cb7d2b904f31663ce605b0",
-    "dest-filename": "@types-bluebird-3.5.20.tgz",
-    "dest": "flatpak-node/yarn-mirror"
-  },
-  {
-    "type": "file",
-    "url": "https://registry.yarnpkg.com/@types/bluebird/-/bluebird-3.5.29.tgz#7cd933c902c4fc83046517a1bef973886d00bdb6",
-    "sha512": "92656d9f14ee52e842113ebaf62aea4263c07b3e0a1671552afa657954727c2de0f921c3d612241597162e29bd0557305012cee7da3c559138c860a64e27fc63",
-    "dest-filename": "@types-bluebird-3.5.29.tgz",
-    "dest": "flatpak-node/yarn-mirror"
-  },
-  {
-    "type": "file",
-    "url": "https://registry.yarnpkg.com/@types/bluebird/-/bluebird-3.5.30.tgz#ee034a0eeea8b84ed868b1aa60d690b08a6cfbc5",
-    "sha512": "f0b873bdc8c8a2aa22d5382112444c91b6e633e8e11e706890f1a42568dc94c2be2acd0cc44068c37fe9dbf8854d9f8e21b24740349fa6075911bf9a7f781f57",
-    "dest-filename": "@types-bluebird-3.5.30.tgz",
-    "dest": "flatpak-node/yarn-mirror"
-  },
-  {
-    "type": "file",
-    "url": "https://registry.yarnpkg.com/@types/bluebird/-/bluebird-3.5.36.tgz#00d9301d4dc35c2f6465a8aec634bb533674c652",
-    "sha512": "1c1371e25864c4dedbc7a3f4fbe5bc136f3d7e84aef243bc182936ba786e56080ef9c13bae1f438595323e15313511bd9bee41e414cac5943964ff76c7f9b1f5",
-    "dest-filename": "@types-bluebird-3.5.36.tgz",
-    "dest": "flatpak-node/yarn-mirror"
-  },
-  {
-    "type": "file",
-    "url": "https://registry.yarnpkg.com/@types/bluebird/-/bluebird-3.5.38.tgz#7a671e66750ccd21c9fc9d264d0e1e5330bc9908",
-    "sha512": "c91fcac5cd1d77815fc2d1282d9328a896ccfd513f5bb8579ff3088dbf9ac5cc1a8348859923caece05466ad5858bca7254a164247d4ac8ed3d070ea180a4d4a",
-    "dest-filename": "@types-bluebird-3.5.38.tgz",
-    "dest": "flatpak-node/yarn-mirror"
-  },
-  {
-    "type": "file",
-    "url": "https://registry.yarnpkg.com/@types/bluebird/-/bluebird-3.5.42.tgz#7ec05f1ce9986d920313c1377a5662b1b563d366",
-    "sha512": "261cbe316465ae8e948d58b9efc57fe1918d7de08e70d0a9d1868534850614a9489a8c2ac1bd4eff6db00d593714318c2eac5da4e577a901c3e5f3c41f884ae8",
-    "dest-filename": "@types-bluebird-3.5.42.tgz",
-    "dest": "flatpak-node/yarn-mirror"
-  },
-  {
-    "type": "file",
     "url": "https://registry.yarnpkg.com/@types/cacheable-request/-/cacheable-request-6.0.3.tgz#a430b3260466ca7b5ca5bfd735693b36e7a9d183",
     "sha512": "210dc46d3cc6c488a06f5237a8f65cd6b5899c7d019922afe506136a5130c1e16fc810cb4807b6e333f495efe1ca2ede7067d9565215020e0166a6fc581c0aab",
     "dest-filename": "@types-cacheable-request-6.0.3.tgz",

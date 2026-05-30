@@ -1,5 +1,3 @@
-import type PromiseBB from "bluebird";
-
 import type { IChunk } from "./IChunk";
 import type { IDownloadOptions } from "./IDownload";
 
@@ -54,7 +52,7 @@ export interface IDownloadJob extends IChunk {
 
   extraCookies: string[];
 
-  dataCB?: (offset: number, data) => PromiseBB<boolean>;
+  dataCB?: (offset: number, data) => Promise<boolean>;
   completionCB?: () => void;
   errorCB?: (err) => void;
   responseCB?: (size: number, fileName: string, chunkable: boolean) => void;

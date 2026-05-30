@@ -16,7 +16,6 @@
   "devDependencies": {
     "@types/redux": "catalog:",
     "@types/redux-thunk": "catalog:",
-    "bluebird": "catalog:",
     "copyfiles": "catalog:",
     "i18next": "catalog:",
     "redux-thunk": "catalog:",

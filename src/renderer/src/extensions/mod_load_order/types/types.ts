@@ -1,5 +1,3 @@
-import type * as Promise from "bluebird";
-
 import type { IActionDefinitionEx } from "../../../controls/ActionControl";
 import type { IMod } from "../../../types/IState";
 

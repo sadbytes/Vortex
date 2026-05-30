@@ -14,7 +14,6 @@ import {
   types,
   util,
 } from "@nexusmods/vortex-api";
-import Bluebird from "bluebird";
 import I18next, { WithT } from "i18next";
 import * as _ from "lodash";
 import { ILookupResult, IModInfo, IReference, IRule, RuleType } from "modmeta-db";
@@ -129,59 +128,61 @@ function updateMetaRules(
   api: types.IExtensionApi,
   gameId: string,
   mods: { [modId: string]: types.IMod },
-): Bluebird<IBiDirRule[]> {
+): Promise<IBiDirRule[]> {
   let rules: IBiDirRule[] = [];
-  return Bluebird.map(Object.keys(mods || {}), (modId) => {
-    const mod = mods[modId];
-    if (mod.attributes === undefined) {
-      return;
-    }
-    const ref = (util as any).makeModReference(mod);
-    if (
-      ref.fileExpression === undefined &&
-      ref.fileMD5 === undefined &&
-      ref.logicalFileName === undefined
-    ) {
-      return;
-    }
-    // Include the mod id so that testModReference can match this reference
-    // back to its mod even when file-based attributes are incomplete
-    ref.id = modId;
-    rules = rules.concat(mapRules(ref, mod.rules));
-    let downloadGame = mod.attributes["downloadGame"] || gameId;
-    if (Array.isArray(downloadGame)) {
-      downloadGame = downloadGame[0];
-    }
+  return util
+    .map(Object.keys(mods || {}), (modId) => {
+      const mod = mods[modId];
+      if (mod.attributes === undefined) {
+        return;
+      }
+      const ref = (util as any).makeModReference(mod);
+      if (
+        ref.fileExpression === undefined &&
+        ref.fileMD5 === undefined &&
+        ref.logicalFileName === undefined
+      ) {
+        return;
+      }
+      // Include the mod id so that testModReference can match this reference
+      // back to its mod even when file-based attributes are incomplete
+      ref.id = modId;
+      rules = rules.concat(mapRules(ref, mod.rules));
+      let downloadGame = mod.attributes["downloadGame"] || gameId;
+      if (Array.isArray(downloadGame)) {
+        downloadGame = downloadGame[0];
+      }
 
-    const state = api.store.getState();
-    const downloadPath = selectors.downloadPathForGame(state, downloadGame);
-    const fileName = mod.attributes?.fileName;
-    const filePath = fileName !== undefined ? path.join(downloadPath, fileName) : undefined;
+      const state = api.store.getState();
+      const downloadPath = selectors.downloadPathForGame(state, downloadGame);
+      const fileName = mod.attributes?.fileName;
+      const filePath = fileName !== undefined ? path.join(downloadPath, fileName) : undefined;
 
-    return api
-      .lookupModMeta({
-        fileMD5: mod.attributes?.fileMD5,
-        fileSize: mod.attributes?.fileSize,
-        filePath,
-        gameId: downloadGame,
-      })
-      .then((meta: ILookupResult[]) => {
-        if (meta.length > 0 && meta[0].value !== undefined) {
-          rules = rules.concat(mapRules(makeReference(meta[0].value), meta[0].value.rules));
-          if (mod.attributes?.fileMD5 === undefined) {
-            api.store.dispatch(
-              actions.setModAttribute(gameId, mod.id, "fileMD5", meta[0].value.fileMD5),
-            );
+      return api
+        .lookupModMeta({
+          fileMD5: mod.attributes?.fileMD5,
+          fileSize: mod.attributes?.fileSize,
+          filePath,
+          gameId: downloadGame,
+        })
+        .then((meta: ILookupResult[]) => {
+          if (meta.length > 0 && meta[0].value !== undefined) {
+            rules = rules.concat(mapRules(makeReference(meta[0].value), meta[0].value.rules));
+            if (mod.attributes?.fileMD5 === undefined) {
+              api.store.dispatch(
+                actions.setModAttribute(gameId, mod.id, "fileMD5", meta[0].value.fileMD5),
+              );
+            }
           }
-        }
-      })
-      .catch((err: Error) => {
-        log("warn", "failed to look up mod", {
-          err: err.message,
-          stack: err.stack,
+        })
+        .catch((err: Error) => {
+          log("warn", "failed to look up mod", {
+            err: err.message,
+            stack: err.stack,
+          });
         });
-      });
-  }).then(() => rules);
+    })
+    .then(() => rules);
 }
 
 function findOverridenByFile(
@@ -560,82 +561,85 @@ function renderRuleType(t: typeof I18next.t, type: RuleType): string {
   }
 }
 
-function checkRulesFulfilled(api: types.IExtensionApi): Bluebird<void> {
+function checkRulesFulfilled(api: types.IExtensionApi): Promise<void> {
   const t = api.translate;
   const store: any = api.store;
   const state = store.getState();
   const enabledMods: IModLookupInfo[] = enabledModKeys(state);
   const activeProfile = selectors.activeProfile(state);
   if (activeProfile === undefined) {
-    return Bluebird.resolve();
+    return Promise.resolve();
   }
   const gameMode = activeProfile.gameId;
   const mods = state.persistent.mods[gameMode];
 
-  return Bluebird.map(enabledMods, (modLookup) => {
-    const mod: types.IMod = mods[modLookup.id];
+  return util
+    .map(enabledMods, (modLookup) => {
+      const mod: types.IMod = mods[modLookup.id];
 
-    let downloadGame = util.getSafe(mod.attributes, ["downloadGame"], gameMode);
-    if (Array.isArray(downloadGame)) {
-      downloadGame = downloadGame[0];
-    }
+      let downloadGame = util.getSafe(mod.attributes, ["downloadGame"], gameMode);
+      if (Array.isArray(downloadGame)) {
+        downloadGame = downloadGame[0];
+      }
 
-    const downloadPath = selectors.downloadPathForGame(state, downloadGame);
-    const fileName = mod.attributes?.fileName;
-    const filePath = fileName !== undefined ? path.join(downloadPath, fileName) : undefined;
+      const downloadPath = selectors.downloadPathForGame(state, downloadGame);
+      const fileName = mod.attributes?.fileName;
+      const filePath = fileName !== undefined ? path.join(downloadPath, fileName) : undefined;
 
-    return api
-      .lookupModMeta({
-        fileMD5: mod.attributes?.fileMD5,
-        fileSize: mod.attributes?.fileSize,
-        filePath,
-        gameId: downloadGame,
-      })
-      .then((meta: ILookupResult[]) => {
-        if (meta.length > 0 && mod.attributes?.fileMD5 === undefined) {
-          api.store.dispatch(
-            actions.setModAttribute(gameMode, mod.id, "fileMD5", meta[0].value.fileMD5),
+      return api
+        .lookupModMeta({
+          fileMD5: mod.attributes?.fileMD5,
+          fileSize: mod.attributes?.fileSize,
+          filePath,
+          gameId: downloadGame,
+        })
+        .then((meta: ILookupResult[]) => {
+          if (meta.length > 0 && mod.attributes?.fileMD5 === undefined) {
+            api.store.dispatch(
+              actions.setModAttribute(gameMode, mod.id, "fileMD5", meta[0].value.fileMD5),
+            );
+          }
+          // get both the rules from the meta server and the ones stored with the mod
+          const rules: IRule[] = [].concat(
+            meta.length > 0 && meta[0].value !== undefined ? meta[0].value.rules || [] : [],
+            util.getSafe(mods[modLookup.id], ["rules"], []),
           );
-        }
-        // get both the rules from the meta server and the ones stored with the mod
-        const rules: IRule[] = [].concat(
-          meta.length > 0 && meta[0].value !== undefined ? meta[0].value.rules || [] : [],
-          util.getSafe(mods[modLookup.id], ["rules"], []),
-        );
-        const rulesUnfulfilled = rules.filter(
-          (rule) =>
-            ruleFulfilled(enabledMods, rule, {
-              gameId: gameMode,
-              modId: mod.id,
-            }) === false,
-        );
-        const res: { modId: string; rules: IRule[] } =
-          rulesUnfulfilled.length === 0
-            ? null
-            : {
+          const rulesUnfulfilled = rules.filter(
+            (rule) =>
+              ruleFulfilled(enabledMods, rule, {
+                gameId: gameMode,
                 modId: mod.id,
-                rules: rulesUnfulfilled,
-              };
-
-        if (mod.attributes?.fileMD5 === undefined && meta?.[0]?.value !== undefined) {
-          store.dispatch(
-            actions.setModAttribute(gameMode, mod.id, "fileMD5", meta[0].value.fileMD5),
+              }) === false,
           );
-        }
+          const res: { modId: string; rules: IRule[] } =
+            rulesUnfulfilled.length === 0
+              ? null
+              : {
+                  modId: mod.id,
+                  rules: rulesUnfulfilled,
+                };
 
-        return Promise.resolve(res);
-      });
-  })
+          if (mod.attributes?.fileMD5 === undefined && meta?.[0]?.value !== undefined) {
+            store.dispatch(
+              actions.setModAttribute(gameMode, mod.id, "fileMD5", meta[0].value.fileMD5),
+            );
+          }
+
+          return Promise.resolve(res);
+        });
+    })
     .then((unfulfilled: Array<{ modId: string; rules: types.IModRule[] }>) => {
       // allow anyone else handle this to give more specific notifications, e.g.
       // based on mod type
-      return Bluebird.map(
-        unfulfilled.filter((iter) => iter !== null),
-        (iter) =>
-          api
-            .emitAndAwait("unfulfilled-rules", activeProfile.id, iter.modId, iter.rules)
-            .then((result: boolean[]) => Promise.resolve(result[0] ? undefined : iter)),
-      ).filter((iter) => iter !== undefined);
+      return util
+        .map(
+          unfulfilled.filter((iter) => iter !== null),
+          (iter) =>
+            api
+              .emitAndAwait("unfulfilled-rules", activeProfile.id, iter.modId, iter.rules)
+              .then((result: boolean[]) => Promise.resolve(result[0] ? undefined : iter)),
+        )
+        .then((__arr) => util.filter(__arr, (iter) => iter !== undefined));
     })
     .then((unfulfilled: Array<{ modId: string; rules: types.IModRule[] }>) => {
       const modsUnfulfilled = unfulfilled.filter((iter) => iter !== null);
@@ -795,7 +799,7 @@ function checkRedundantFileOverrides(api: types.IExtensionApi) {
   //  e.g. https://github.com/Nexus-Mods/Vortex/issues/9671 where the user
   //  is manually removing files from the staging folder.
   return () =>
-    new Bluebird<types.ITestResult>((resolve, reject) => {
+    new Promise<types.ITestResult>((resolve, reject) => {
       const state = api.store.getState();
       const gameId = selectors.activeGameId(state);
       const discovery = selectors.discoveryByGame(state, gameId);
@@ -810,48 +814,49 @@ function checkRedundantFileOverrides(api: types.IExtensionApi) {
       const fileExists = (filePath: string) =>
         fs
           .statAsync(filePath)
-          .then(() => Bluebird.resolve(true))
-          .catch((err) =>
-            err.code !== "ENOENT" ? Bluebird.resolve(true) : Bluebird.resolve(false),
-          );
+          .then(() => Promise.resolve(true))
+          .catch((err) => (err.code !== "ENOENT" ? Promise.resolve(true) : Promise.resolve(false)));
 
       const game: types.IGame = util.getGame(gameId);
       const modPaths = game.getModPaths(discovery.path);
-      return Bluebird.reduce(
-        modsWithFileOverrides,
-        (accum, iter) => {
-          if (iter?.installationPath === undefined) {
-            // The state has changed since this test executed (yes it can happen); if the mod is no longer
-            //  installed, we can just jump to the next mod id.
-            return accum;
-          }
-          const deployPath = modPaths[iter.type];
-          if (deployPath === undefined) {
-            return accum;
-          }
-          const missing: string[] = [];
-          const stagingFolder = selectors.installPathForGame(state, gameId);
-          const modInstallationPath = iter.installationPath;
-          const modPath = path.join(stagingFolder, modInstallationPath);
-          const filePaths = iter.fileOverrides.map((file) => {
-            const relPath = path.relative(deployPath, file);
-            return { rel: relPath, abs: path.join(modPath, relPath) };
-          });
-          return Bluebird.each(filePaths, (filePath) =>
-            fileExists(filePath.abs).then((res) => {
-              if (res === false) {
-                missing.push(filePath.abs);
-              }
-            }),
-          ).then(() => {
-            if (missing.length > 0) {
-              accum[iter.id] = missing;
+      return util
+        .reduce(
+          modsWithFileOverrides,
+          (accum, iter) => {
+            if (iter?.installationPath === undefined) {
+              // The state has changed since this test executed (yes it can happen); if the mod is no longer
+              //  installed, we can just jump to the next mod id.
+              return accum;
             }
-            return Promise.resolve(accum);
-          });
-        },
-        {},
-      )
+            const deployPath = modPaths[iter.type];
+            if (deployPath === undefined) {
+              return accum;
+            }
+            const missing: string[] = [];
+            const stagingFolder = selectors.installPathForGame(state, gameId);
+            const modInstallationPath = iter.installationPath;
+            const modPath = path.join(stagingFolder, modInstallationPath);
+            const filePaths = iter.fileOverrides.map((file) => {
+              const relPath = path.relative(deployPath, file);
+              return { rel: relPath, abs: path.join(modPath, relPath) };
+            });
+            return util
+              .each(filePaths, (filePath) =>
+                fileExists(filePath.abs).then((res) => {
+                  if (res === false) {
+                    missing.push(filePath.abs);
+                  }
+                }),
+              )
+              .then(() => {
+                if (missing.length > 0) {
+                  accum[iter.id] = missing;
+                }
+                return Promise.resolve(accum);
+              });
+          },
+          {},
+        )
         .then((redundant) => {
           removeFileOverrideRedundancies(api, gameId, redundant);
           return Promise.resolve();
@@ -905,7 +910,7 @@ function updateCycles(api: types.IExtensionApi, cycles: string[][]) {
   }
 }
 
-function generateLoadOrder(api: types.IExtensionApi): Bluebird<void> {
+function generateLoadOrder(api: types.IExtensionApi): Promise<void> {
   const store = api.store;
   const gameMode = selectors.activeGameId(store.getState());
   const state: types.IState = store.getState();
@@ -1142,7 +1147,7 @@ function queryEnableDependencies(
   modIds: string[],
   gameMode: string,
   enabled: boolean,
-): Bluebird<void> {
+): Promise<void> {
   const t = api.translate;
   const state = api.getState();
   const mods = state.persistent.mods[gameMode];
@@ -1274,7 +1279,7 @@ function queryEnableDependencies(
         }
       });
   } else {
-    return Bluebird.resolve();
+    return Promise.resolve();
   }
 }
 
@@ -1687,7 +1692,7 @@ function main(context: types.IExtensionContext) {
   context.registerStartHook(50, "check-unsolved-conflicts", (input: types.IRunParameters) =>
     input.options.suggestDeploy !== false
       ? unsolvedConflictsCheck(context.api, dependencyState.modRules, input)
-      : Bluebird.resolve(input),
+      : Promise.resolve(input),
   );
 
   context.once(() => once(context.api));

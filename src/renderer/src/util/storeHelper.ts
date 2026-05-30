@@ -2,7 +2,6 @@
  * Helper functions when working with immutable state (or immutable objects in general)
  */
 
-import PromiseBB from "bluebird";
 import type * as Redux from "redux";
 
 import type { IGameStored } from "../extensions/gamemode_management/types/IGameStored";
@@ -322,8 +321,8 @@ export function rehydrate<T extends object>(
   return inState !== undefined ? merge(replace ? defaults : state, [], inState) : state;
 }
 
-function waitUntil(predicate: () => boolean, interval: number = 100): PromiseBB<void> {
-  return new PromiseBB<void>((resolve, reject) => {
+function waitUntil(predicate: () => boolean, interval: number = 100): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
     setTimeout(() => {
       if (predicate()) {
         resolve();
@@ -343,9 +342,9 @@ function waitUntil(predicate: () => boolean, interval: number = 100): PromiseBB<
  *
  * @export
  * @param {*} state
- * @returns {PromiseBB<IGameStored>}
+ * @returns {Promise<IGameStored>}
  */
-export function currentGame(store: Redux.Store<any>): PromiseBB<IGameStored> {
+export function currentGame(store: Redux.Store<any>): Promise<IGameStored> {
   const fallback: IGameStored = {
     id: "__placeholder",
     name: "<No game>",
@@ -377,7 +376,7 @@ export function currentGame(store: Redux.Store<any>): PromiseBB<IGameStored> {
   if (knownGames !== null && knownGames !== undefined) {
     const gameMode = getActiveGameId(store.getState());
     const res = knownGames.find((ele) => ele.id === gameMode);
-    return PromiseBB.resolve(res || fallback);
+    return Promise.resolve(res || fallback);
   } else {
     return waitUntil(() => {
       knownGames = getSafe<IGameStored[] | null>(
@@ -390,7 +389,7 @@ export function currentGame(store: Redux.Store<any>): PromiseBB<IGameStored> {
       const gameMode = getActiveGameId(store.getState());
 
       const res = knownGames?.find((ele) => ele.id === gameMode);
-      return PromiseBB.resolve(res || fallback);
+      return Promise.resolve(res || fallback);
     });
   }
 }

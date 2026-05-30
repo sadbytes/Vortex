@@ -5,7 +5,6 @@ import { type Span, context, ROOT_CONTEXT, SpanStatusCode, trace } from "@opente
 import { isEnvironmentalError, unknownToError } from "@vortex/shared";
 import { isUserCanceled } from "@vortex/shared/errors";
 import { recordErrorOnSpan } from "@vortex/shared/telemetry";
-import type PromiseBB from "bluebird";
 import type { BrowserWindow } from "electron";
 import { ipcRenderer } from "electron";
 import * as fs from "fs-extra";
@@ -418,7 +417,7 @@ export function clearErrorContext(id: string) {
  * @param value context value
  * @param fun the function to set
  */
-export function withContext(id: string, value: string, fun: () => PromiseBB<any>) {
+export function withContext(id: string, value: string, fun: () => Promise<any>) {
   return withTrackedActivity("vortex.context", id, { "context.value": value }, () => fun(), {
     root: true,
   });
@@ -444,7 +443,7 @@ export type SetError = (error: Error) => void;
 export type TrackedFunction<T> = (
   setAttribute: SetAttribute,
   setError: SetError,
-) => PromiseBB<T> | Promise<T>;
+) => Promise<T> | Promise<T>;
 
 export interface TrackedActivityOptions {
   /** Start a new root trace instead of inheriting the active parent span. */
@@ -459,7 +458,7 @@ export interface TrackedActivityOptions {
  *
  * Pass `{ root: true }` for top-level operations (downloads, installs) that
  * should start a new trace rather than becoming children of whatever span
- * happens to be active in the Bluebird chain.
+ * happens to be active in the Promise chain.
  */
 export function withTrackedActivity<T>(
   tracerName: string,

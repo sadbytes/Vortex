@@ -1,7 +1,6 @@
 import * as path from "path";
 
 import { fs, log, types, util } from "@nexusmods/vortex-api";
-import Promise from "bluebird";
 import * as modmeta from "modmeta-db";
 
 import { IFileEntry, IModEntry, ParseError } from "../types/nmmEntries";
@@ -75,7 +74,7 @@ export function parseModEntries(xmlData: string, mods: IModMap): Promise<IModEnt
       );
     }
 
-    return Promise.map(Array.from(modInfoList), (modInfo: Element): Promise<IModEntry> => {
+    return util.map(Array.from(modInfoList), (modInfo: Element): Promise<IModEntry> => {
       const res: IModEntry = {
         nexusId: modInfo.getAttribute("modId"),
         vortexId: undefined,

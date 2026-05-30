@@ -1,5 +1,4 @@
 import { fs, selectors, types, log } from "@nexusmods/vortex-api";
-import Bluebird from "bluebird";
 import getVersion from "exe-version";
 import * as semver from "semver";
 
@@ -39,8 +38,8 @@ const getGamePath = (gameId: string, api): string => {
   }
 };
 
-function toBlue<T>(func: (...args: any[]) => Promise<T>): (...args: any[]) => Bluebird<T> {
-  return (...args: any[]) => Bluebird.resolve(func(...args));
+function toBlue<T>(func: (...args: any[]) => Promise<T>): (...args: any[]) => Promise<T> {
+  return (...args: any[]) => Promise.resolve(func(...args));
 }
 
 function clearNotifications(api: types.IExtensionApi, preserveMissing?: boolean) {

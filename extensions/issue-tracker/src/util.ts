@@ -2,8 +2,6 @@ import { IncomingMessage } from "http";
 import { get } from "https";
 import * as url from "url";
 
-import Promise from "bluebird";
-
 import {
   IGithubComment,
   IGithubCommentCache,

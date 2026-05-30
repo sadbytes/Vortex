@@ -99,12 +99,10 @@ function delFake(filePath: string): void {
 }
 
 vi.mock("./fs", async () => {
-  const Bluebird = (await import("bluebird")).default;
-
   return {
     statAsync: (filePath: string) => {
       const dev = filePath.startsWith(path.sep + "drivea") ? 1 : 2;
-      return Bluebird.resolve({
+      return Promise.resolve({
         dev,
         ino: Math.floor(Math.random() * 1000000),
         isDirectory: filePath.indexOf(".") === -1,
@@ -114,32 +112,32 @@ vi.mock("./fs", async () => {
     },
     ensureDirWritableAsync: vi.fn((dirPath: string) => {
       insertFake(dirPath, {});
-      return Bluebird.resolve(undefined);
+      return Promise.resolve(undefined);
     }),
     mkdirsAsync: vi.fn((dirPath: string) => {
       insertFake(dirPath, {});
-      return Bluebird.resolve(undefined);
+      return Promise.resolve(undefined);
     }),
     copyAsync: vi.fn((source: string, dest: string) => {
       const info = getFake(source);
       if (info.fail !== undefined) {
-        return Bluebird.reject(info.fail);
+        return Promise.reject(info.fail);
       }
       insertFake(dest, { ...info, type: "copied" });
-      return Bluebird.resolve(undefined);
+      return Promise.resolve(undefined);
     }),
     linkAsync: vi.fn((source: string, dest: string) => {
       const info = getFake(source);
       if (info.fail !== undefined) {
-        return Bluebird.reject(info.fail);
+        return Promise.reject(info.fail);
       }
       insertFake(dest, { ...info, type: "linked" });
-      return Bluebird.resolve(undefined);
+      return Promise.resolve(undefined);
     }),
     rmdirAsync: vi.fn((dirPath: string) => {
       const info = getFake(dirPath);
       if (Object.keys(info).length > 0) {
-        return Bluebird.reject(
+        return Promise.reject(
           Object.assign(new Error("not empty"), {
             path: dirPath,
             code: "ENOTEMPTY",
@@ -147,17 +145,17 @@ vi.mock("./fs", async () => {
         );
       }
       delFake(dirPath);
-      return Bluebird.resolve(undefined);
+      return Promise.resolve(undefined);
     }),
     removeAsync: vi.fn((filePath: string) => {
       delFake(filePath);
-      return Bluebird.resolve(undefined);
+      return Promise.resolve(undefined);
     }),
     ensureDirAsync: vi.fn((dirPath: string) => {
       insertFake(dirPath, {});
-      return Bluebird.resolve(undefined);
+      return Promise.resolve(undefined);
     }),
-    readdirAsync: () => Bluebird.resolve([]),
+    readdirAsync: () => Promise.resolve([]),
   };
 });
 

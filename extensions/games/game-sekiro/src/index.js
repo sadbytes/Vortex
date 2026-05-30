@@ -1,4 +1,3 @@
-const Promise = require("bluebird");
 const path = require("path");
 const { actions, fs, util } = require("@nexusmods/vortex-api");
 

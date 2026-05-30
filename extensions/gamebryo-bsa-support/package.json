@@ -22,7 +22,6 @@
     "@types/i18next": "catalog:",
     "@types/node": "catalog:",
     "@types/rimraf": "catalog:",
-    "bluebird": "catalog:",
     "bsatk": "catalog:",
     "copyfiles": "catalog:",
     "rimraf": "catalog:",

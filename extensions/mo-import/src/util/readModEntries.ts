@@ -1,7 +1,6 @@
 import * as path from "path";
 
 import { fs, log, types, util } from "@nexusmods/vortex-api";
-import Promise from "bluebird";
 import { generate as shortid } from "shortid";
 import IniParser, { IniFile, WinapiFormat } from "vortex-parse-ini";
 
@@ -67,36 +66,41 @@ function readModEntries(
 ): Promise<IModEntry[]> {
   return fs
     .readdirAsync(basePath)
-    .filter(
-      (fileName: string) =>
-        dirsOnly(path.join(basePath, fileName)) && !fileName.endsWith(SEPERATOR_SUFFIX),
+    .then((__arr) =>
+      util.filter(
+        __arr,
+        (fileName: string) =>
+          dirsOnly(path.join(basePath, fileName)) && !fileName.endsWith(SEPERATOR_SUFFIX),
+      ),
     )
-    .map((modPath: string) =>
-      parseMetaIni(path.join(basePath, modPath))
-        .then((metaInfo: IMetaInfo): IModEntry => {
-          const vortexId =
-            path.basename(metaInfo.installationFile, path.extname(metaInfo.installationFile)) ||
-            modPath ||
-            shortid();
+    .then((__a) =>
+      util.map(__a, (modPath: string) =>
+        parseMetaIni(path.join(basePath, modPath))
+          .then((metaInfo: IMetaInfo): IModEntry => {
+            const vortexId =
+              path.basename(metaInfo.installationFile, path.extname(metaInfo.installationFile)) ||
+              modPath ||
+              shortid();
 
-          return {
-            vortexId,
-            nexusId: !!metaInfo.modid ? metaInfo.modid.toString() : undefined,
-            downloadId: metaInfo.fileid || undefined,
-            modName: modPath,
-            archiveName: metaInfo.installationFile,
-            modVersion: metaInfo.version,
-            importFlag: true,
-            isAlreadyManaged: util.getSafe(mods, [modPath], undefined) !== undefined,
-            categoryId: metaInfo.categoryIds[0],
-          };
-        })
-        .catch((err) => {
-          log("warn", "failed to read MO mod", { modPath, err: err.message });
-          return undefined;
-        }),
+            return {
+              vortexId,
+              nexusId: !!metaInfo.modid ? metaInfo.modid.toString() : undefined,
+              downloadId: metaInfo.fileid || undefined,
+              modName: modPath,
+              archiveName: metaInfo.installationFile,
+              modVersion: metaInfo.version,
+              importFlag: true,
+              isAlreadyManaged: util.getSafe(mods, [modPath], undefined) !== undefined,
+              categoryId: metaInfo.categoryIds[0],
+            };
+          })
+          .catch((err) => {
+            log("warn", "failed to read MO mod", { modPath, err: err.message });
+            return undefined;
+          }),
+      ),
     )
-    .filter((entry: IModEntry) => entry !== undefined)
+    .then((__a) => util.filter(__a, (entry: IModEntry) => entry !== undefined))
     .catch((err) => {
       log("warn", "failed to read MO base path", {
         basePath,

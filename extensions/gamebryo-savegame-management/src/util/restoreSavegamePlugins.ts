@@ -1,7 +1,6 @@
 import * as path from "path";
 
 import { fs, types } from "@nexusmods/vortex-api";
-import Promise from "bluebird";
 
 import { ISavegame } from "../types/ISavegame";
 

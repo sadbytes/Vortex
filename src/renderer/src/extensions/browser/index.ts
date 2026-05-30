@@ -1,6 +1,5 @@
 import * as url from "url";
 
-import PromiseBB from "bluebird";
 import { ipcRenderer } from "electron";
 import { generate as shortid } from "shortid";
 
@@ -55,7 +54,7 @@ function doBrowse(
   subscriptionId: string,
   skippable: boolean,
 ) {
-  return new PromiseBB<string>((resolve, reject) => {
+  return new Promise<string>((resolve, reject) => {
     lastURL = navUrl;
     subscribe(subscriptionId, "close", (skip: boolean) => {
       reject(new UserCanceled(skip));

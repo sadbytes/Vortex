@@ -1,7 +1,6 @@
 import * as path from "path";
 
 import { actions, fs, log, types, util } from "@nexusmods/vortex-api";
-import Promise from "bluebird";
 import {} from "redux-thunk";
 import * as winapi from "winapi-bindings";
 
@@ -132,9 +131,11 @@ function init(context: types.IExtensionContext) {
         }
         gedosatoPath = location;
       })
-      .catch({ systemCode: 2 }, (err) => {
-        log("info", "GeDoSaTo not installed");
-      })
+      .catch(
+        util.only({ systemCode: 2 }, (err) => {
+          log("info", "GeDoSaTo not installed");
+        }),
+      )
       .catch((err) => {
         log("warn", "failed to look for GeDoSaTo", { err: err.message });
       }) as any;

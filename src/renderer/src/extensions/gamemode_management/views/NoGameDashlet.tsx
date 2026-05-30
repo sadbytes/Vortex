@@ -1,4 +1,3 @@
-import PromiseBB from "bluebird";
 import * as React from "react";
 
 import { ComponentEx, connect, translate } from "../../../controls/ComponentEx";
@@ -100,7 +99,7 @@ class Dashlet extends ComponentEx<IProps, IComponentState> {
   };
 
   private refreshGameInfo = (gameId) => {
-    return new PromiseBB<void>((resolve, reject) => {
+    return new Promise<void>((resolve, reject) => {
       this.context.api.events.emit("refresh-game-info", gameId, (err) => {
         if (err !== null) {
           reject(err);

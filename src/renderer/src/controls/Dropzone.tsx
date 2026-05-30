@@ -1,6 +1,5 @@
 import * as url from "url";
 
-import type PromiseBB from "bluebird";
 import { webUtils } from "electron";
 import * as React from "react";
 import type { WithTranslation } from "react-i18next";
@@ -44,7 +43,7 @@ interface IActionProps {
     title: string,
     content: IDialogContent,
     actions: DialogActions,
-  ) => PromiseBB<IDialogResult>;
+  ) => Promise<IDialogResult>;
 }
 
 type DropMode = "no" | "url" | "file" | "hover" | "invalid";

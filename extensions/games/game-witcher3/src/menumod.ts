@@ -2,7 +2,6 @@
 import path from "path";
 
 import { actions, fs, log, selectors, types, util } from "@nexusmods/vortex-api";
-import Bluebird from "bluebird";
 const IniParser = require("vortex-parse-ini");
 import { generate } from "shortid";
 
@@ -131,39 +130,43 @@ function populateCache(
   };
 
   const stagingFolder = selectors.installPathForGame(state, GAME_ID);
-  return Bluebird.reduce(
-    enabledMods,
-    (accum, mod: types.IMod) => {
-      if (mod.installationPath === undefined) {
-        return accum;
+  return util
+    .reduce(
+      enabledMods,
+      (accum, mod: types.IMod) => {
+        if (mod.installationPath === undefined) {
+          return accum;
+        }
+        return getRelevantModEntries(path.join(stagingFolder, mod.installationPath)).then(
+          (entries) => {
+            return util
+              .each(entries, (filepath) => {
+                return readModData(filepath).then((data) => {
+                  if (data !== undefined) {
+                    accum.push({ id: mod.id, filepath, data });
+                  }
+                });
+              })
+              .then(() => Promise.resolve(accum));
+          },
+        );
+      },
+      initialCacheValue !== undefined ? initialCacheValue : [],
+    )
+    .then((newCache) => {
+      const modName = menuMod(activeProfile.name);
+      let mod = util.getSafe(state, ["persistent", "mods", GAME_ID, modName], undefined);
+      if (mod?.installationPath === undefined) {
+        log("warn", "failed to ascertain installation path", modName);
+        // We will create it on the next run.
+        return Promise.resolve();
       }
-      return getRelevantModEntries(path.join(stagingFolder, mod.installationPath)).then(
-        (entries) => {
-          return Bluebird.each(entries, (filepath) => {
-            return readModData(filepath).then((data) => {
-              if (data !== undefined) {
-                accum.push({ id: mod.id, filepath, data });
-              }
-            });
-          }).then(() => Promise.resolve(accum));
-        },
-      );
-    },
-    initialCacheValue !== undefined ? initialCacheValue : [],
-  ).then((newCache) => {
-    const modName = menuMod(activeProfile.name);
-    let mod = util.getSafe(state, ["persistent", "mods", GAME_ID, modName], undefined);
-    if (mod?.installationPath === undefined) {
-      log("warn", "failed to ascertain installation path", modName);
-      // We will create it on the next run.
-      return Promise.resolve();
-    }
 
-    return fs.writeFileAsync(
-      path.join(stagingFolder, mod.installationPath, CACHE_FILENAME),
-      JSON.stringify(newCache),
-    );
-  });
+      return fs.writeFileAsync(
+        path.join(stagingFolder, mod.installationPath, CACHE_FILENAME),
+        JSON.stringify(newCache),
+      );
+    });
 }
 
 function convertFilePath(filePath, installPath) {
@@ -235,39 +238,41 @@ export async function onWillDeploy(api, deployment, activeProfile) {
 
   const keys = Object.keys(fileMap);
   const matcher = (entry) => keys.includes(toFileMapKey(entry.relPath));
-  const newCache = await Bluebird.reduce(
+  const newCache = await util.reduce(
     keys,
     async (accum, key) => {
       if (docFiles.find(matcher) !== undefined) {
         const mergedData = await parser.read(path.join(docModPath, key));
-        await Bluebird.each(fileMap[key], async (iter: ICacheEntry) => {
+        await util.each(fileMap[key], async (iter: ICacheEntry) => {
           if (enabledMods.includes(iter.id)) {
             const tempPath = path.join(destinationFolder, key) + generate();
             const modData = await toIniFileObject(iter.data, tempPath);
             const modKeys = Object.keys(modData.data);
             let changed = false;
-            return Bluebird.each(modKeys, (modKey) => {
-              if (
-                mergedData.data[modKey] !== undefined &&
-                modData.data[modKey] !== undefined &&
-                mergedData.data[modKey] !== modData.data[modKey]
-              ) {
-                modData.data[modKey] = mergedData.data[modKey];
-                changed = true;
-              }
-            }).then(async () => {
-              let newModData;
-              if (changed) {
-                await parser.write(iter.filepath, modData);
-                newModData = await readModData(iter.filepath);
-              } else {
-                newModData = iter.data;
-              }
+            return util
+              .each(modKeys, (modKey) => {
+                if (
+                  mergedData.data[modKey] !== undefined &&
+                  modData.data[modKey] !== undefined &&
+                  mergedData.data[modKey] !== modData.data[modKey]
+                ) {
+                  modData.data[modKey] = mergedData.data[modKey];
+                  changed = true;
+                }
+              })
+              .then(async () => {
+                let newModData;
+                if (changed) {
+                  await parser.write(iter.filepath, modData);
+                  newModData = await readModData(iter.filepath);
+                } else {
+                  newModData = iter.data;
+                }
 
-              if (newModData !== undefined) {
-                accum.push({ id: iter.id, filepath: iter.filepath, data: newModData });
-              }
-            });
+                if (newModData !== undefined) {
+                  accum.push({ id: iter.id, filepath: iter.filepath, data: newModData });
+                }
+              });
           }
         });
       }

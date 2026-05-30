@@ -1,6 +1,5 @@
 const path = require("path");
 const semver = require("semver");
-const Promise = require("bluebird");
 const { util } = require("@nexusmods/vortex-api");
 
 const { BAS_EXEC, GAME_ID, MOD_MANIFEST } = require("./common");
@@ -106,16 +105,16 @@ async function installOfficialMod(files, destinationPath, gameId, progressDelega
       },
     );
 
-  return Promise.map(manifestFiles, (manFile) => createInstructions(manFile)).then(
-    (manifestMods) => {
+  return util
+    .map(manifestFiles, (manFile) => createInstructions(manFile))
+    .then((manifestMods) => {
       const instructions = manifestMods.reduce((prev, instructions) => {
         prev = prev.concat(instructions);
         return prev;
       }, []);
 
       return Promise.resolve({ instructions });
-    },
-  );
+    });
 }
 
 async function installMulleMod(files, destinationPath, gameId, progressDelegate, api) {

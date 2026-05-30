@@ -1,6 +1,5 @@
 import * as path from "path";
 
-import Bluebird from "bluebird";
 import * as React from "react";
 import { ListGroup, ListGroupItem } from "react-bootstrap";
 import { useSelector } from "react-redux";
@@ -129,7 +128,7 @@ const TweakListConnected = translate(["common"])(
 
 interface ITweakListWrapProps {
   modId: string;
-  getTweaks: (modsPath: string, mod: IMod) => Bluebird<string[]>;
+  getTweaks: (modsPath: string, mod: IMod) => Promise<string[]>;
 }
 
 function TweakListWrap(props: ITweakListWrapProps) {
@@ -155,11 +154,11 @@ function TweakListWrap(props: ITweakListWrapProps) {
 }
 
 const renderINITweaks = (() => {
-  const tweakLists: { [modId: string]: Bluebird<string[]> } = {};
+  const tweakLists: { [modId: string]: Promise<string[]> } = {};
 
   const getTweakList = (modsPath: string, mod: IMod) => {
     if (mod?.installationPath === undefined) {
-      return Bluebird.resolve([]);
+      return Promise.resolve([]);
     }
 
     if (tweakLists[mod.id] === undefined && mod?.installationPath !== undefined) {

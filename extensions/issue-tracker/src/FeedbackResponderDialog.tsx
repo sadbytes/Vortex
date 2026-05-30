@@ -11,7 +11,6 @@ import {
   tooltip,
   util,
 } from "@nexusmods/vortex-api";
-import Promise from "bluebird";
 import _ from "lodash";
 import * as React from "react";
 import {
@@ -646,8 +645,9 @@ class FeedbackResponderDialog extends ComponentEx<IProps, IComponentState> {
         }
 
         if (removeFiles !== undefined) {
-          Promise.each(removeFiles, (removeFile) => fs.removeAsync(removeFile)).catch(
-            (innerErr) => {
+          util
+            .each(removeFiles, (removeFile) => fs.removeAsync(removeFile))
+            .catch((innerErr) => {
               onShowError(
                 "An error occurred removing temporary feedback files",
                 innerErr,
@@ -655,8 +655,7 @@ class FeedbackResponderDialog extends ComponentEx<IProps, IComponentState> {
               );
 
               return Promise.resolve();
-            },
-          );
+            });
         }
 
         const filteredOut = outstandingIssues.filter(

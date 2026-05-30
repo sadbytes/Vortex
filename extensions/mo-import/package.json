@@ -15,14 +15,12 @@
     "extensionName": "Import Tool: Mod Organizer (MO)"
   },
   "devDependencies": {
-    "@types/bluebird": "catalog:",
     "@types/i18next": "catalog:",
     "@types/react": "catalog:",
     "@types/react-bootstrap": "catalog:",
     "@types/react-dom": "catalog:",
     "@types/react-redux": "catalog:",
     "@types/react-router": "catalog:",
-    "bluebird": "catalog:",
     "copyfiles": "catalog:",
     "i18next": "catalog:",
     "immutability-helper": "catalog:",

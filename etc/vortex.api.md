@@ -7,7 +7,6 @@
 import { accessSync } from 'original-fs';
 import type { Action } from 'redux';
 import { appendFileSync } from 'original-fs';
-import Bluebird from 'bluebird';
 import type { BrowserWindow } from 'electron';
 import { Button } from 'react-bootstrap';
 import type { ClientRequest } from 'http';
@@ -72,8 +71,6 @@ import { Overlay as Overlay_2 } from 'react-bootstrap';
 import { OverlayTrigger as OverlayTrigger_2 } from 'react-bootstrap';
 import { ParametricKeySelector } from 're-reselect';
 import { ParametricSelector } from 're-reselect';
-import { default as Promise_2 } from 'bluebird';
-import type * as Promise_3 from 'bluebird';
 import * as React_2 from 'react';
 import { default as React_3 } from 'react';
 import { ReactNode } from 'react';
@@ -399,7 +396,7 @@ const addMods: reduxAct.ComplexActionCreator2<string, IMod[], {
 }, {}>;
 
 // @public
-function addNotification(notification: INotification): (dispatch: any) => Promise_2<void> | Promise<void>;
+function addNotification(notification: INotification): (dispatch: any) => Promise<void>;
 
 // @public (undocumented)
 function addReducer<ActionT, StateT>(action: ActionT, handler: (state: StateT, payload: PayloadT<ActionT>) => StateT): {
@@ -416,28 +413,31 @@ export const Advanced: React_2.ComponentType<{}>;
 const apiKey: (state: IState) => string;
 
 // @public (undocumented)
-const appendFileAsync: (file: string, data: any, options?: fs_2.WriteFileOptions) => Promise_2<void>;
+const appendFileAsync: (file: string, data: any, options?: fs_2.WriteFileOptions) => Promise<void>;
 
 // @public
 class Archive {
     constructor(handler: IArchiveHandler);
-    get addFile(): ((filePath: string, sourcePath: string) => Promise_2<void>) | undefined;
-    get create(): ((sourcePath: string) => Promise_2<void>) | undefined;
-    get extractAll(): ((outputPath: string) => Promise_2<void>) | undefined;
-    get extractFile(): ((filePath: string, outputPath: string) => Promise_2<void>) | undefined;
-    get readDir(): ((archivePath: string) => Promise_2<string[]>) | undefined;
+    get addFile(): ((filePath: string, sourcePath: string) => Promise<void>) | undefined;
+    get create(): ((sourcePath: string) => Promise<void>) | undefined;
+    get extractAll(): ((outputPath: string) => Promise<void>) | undefined;
+    get extractFile(): ((filePath: string, outputPath: string) => Promise<void>) | undefined;
+    get readDir(): ((archivePath: string) => Promise<string[]>) | undefined;
     get readFile(): ((filePath: string) => NodeJS.ReadableStream) | undefined;
     // (undocumented)
-    get write(): (() => Promise_2<void>) | undefined;
+    get write(): (() => Promise<void>) | undefined;
 }
 
 // @public (undocumented)
-type ArchiveHandlerCreator = (fileName: string, options: IArchiveOptions) => Promise_2<IArchiveHandler>;
+type ArchiveHandlerCreator = (fileName: string, options: IArchiveOptions) => Promise<IArchiveHandler>;
 
 // @public (undocumented)
 class ArgumentInvalid extends Error {
     constructor(argument: string);
 }
+
+// @public
+type AsyncMapper<T, U> = (item: T, index: number, length: number) => U | PromiseLike<U>;
 
 // @public
 type AttributeExtractor = (modInfo: any, modPath: string) => PromiseLike<{
@@ -502,10 +502,10 @@ enum Campaign {
 export type ChangeDataHandler = (rowId: string, attributeId: string, newValue: any) => void;
 
 // @public (undocumented)
-function changeFileAttributes(filePath: string, wantedAttributes: number, stat: fs_2.Stats): Promise_2<void>;
+function changeFileAttributes(filePath: string, wantedAttributes: number, stat: fs_2.Stats): Promise<void>;
 
 // @public (undocumented)
-function changeFileOwnership(filePath: string, stat: fs_2.Stats): Promise_2<void>;
+function changeFileOwnership(filePath: string, stat: fs_2.Stats): Promise<void>;
 
 // @public
 function changeOrNop<T>(state: T, path: Array<string | number>, value: any): T;
@@ -517,7 +517,7 @@ type CheckFunction = () => PromiseLike<ITestResult>;
 function checksum(input: Buffer): string;
 
 // @public (undocumented)
-const chmodAsync: (path: string, mode: string | number) => Promise_2<void>;
+const chmodAsync: (path: string, mode: string | number) => Promise<void>;
 
 // @public (undocumented)
 const clearDialog: ComplexActionCreator1<string, {
@@ -554,7 +554,7 @@ class ClickPopover extends React_2.Component<ClickPopoverProps, {
 type ClickPopoverProps = ButtonProps & IIconButtonExtraProps & {};
 
 // @public (undocumented)
-const closeAsync: (fd: number) => Promise_2<void>;
+const closeAsync: (fd: number) => Promise<void>;
 
 // @public (undocumented)
 const closeBrowser: EmptyActionCreator;
@@ -742,13 +742,13 @@ function convertGameIdReverse(knownGames: IGameStored[], input: string): string;
 function copyAsync(src: string, dest: string, options?: fs_2.CopyOptions & {
     noSelfCopy?: boolean;
     showDialogCallback?: () => boolean;
-}): Promise_2<void>;
+}): Promise<void>;
 
 // @public
-function copyFileAtomic(srcPath: string, destPath: string): Promise_2<void>;
+function copyFileAtomic(srcPath: string, destPath: string): Promise<void>;
 
 // @public
-function copyRecursive(source: string, destination: string): Promise_2<void>;
+function copyRecursive(source: string, destination: string): Promise<void>;
 
 // @public (undocumented)
 const currentActivator: ((state: IState) => string) & OutputSelectorFields<(args_0: {
@@ -767,7 +767,7 @@ clearCache: () => void;
 };
 
 // @public
-function currentGame_2(store: Redux.Store<any>): Promise_2<IGameStored>;
+function currentGame_2(store: Redux.Store<any>): Promise<IGameStored>;
 
 // @public
 function currentGameDiscovery(state: any): IDiscoveryResult;
@@ -814,7 +814,7 @@ function deepMerge(lhs: any, rhs: any): any;
 const _default: GitHub;
 
 // @public
-function delay(timeoutMS: number): Bluebird<void>;
+function delay(timeoutMS: number): Promise<void>;
 
 // @public
 function deleteOrNop<T>(state: T, path: Array<string | number>): T;
@@ -862,13 +862,13 @@ const discoveryByGame: ParametricSelector<IState, string, IDiscoveryResult> & {
 };
 
 // @public (undocumented)
-function dismissAllNotifications(): (dispatch: any) => Promise_2<void>;
+function dismissAllNotifications(): (dispatch: any) => Promise<void>;
 
 // @public
 const dismissDialog: ComplexActionCreator1<any, any, {}>;
 
 // @public (undocumented)
-function dismissNotification(id: string): (dispatch: any) => Promise_2<void>;
+function dismissNotification(id: string): (dispatch: any) => Promise<void>;
 
 // @public
 const displayGroup: ComplexActionCreator2<string, string, {
@@ -943,6 +943,9 @@ export function DropdownButton(props: IProps_2): JSX.Element;
 // @public (undocumented)
 export const Dropzone: React_2.ComponentClass<IBaseProps_5>;
 
+// @public
+function each<T>(items: readonly T[], iterator: (item: T, index: number, length: number) => unknown | PromiseLike<unknown>): Promise<readonly T[]>;
+
 // Warning: (ae-forgotten-export) The symbol "IEmptyPlaceholderProps" needs to be exported by the entry point api.d.ts
 //
 // @public (undocumented)
@@ -978,16 +981,16 @@ instanceId: string;
 }, {}>;
 
 // @public (undocumented)
-function ensureDirAsync(dirPath: string, onDirCreatedCB?: (created: string) => PromiseLike<void>): Promise_2<void>;
+function ensureDirAsync(dirPath: string, onDirCreatedCB?: (created: string) => PromiseLike<void>): Promise<void>;
 
 // @public (undocumented)
 function ensureDirSync(dirPath: string): void;
 
 // @public (undocumented)
-function ensureDirWritableAsync(dirPath: string, confirm?: () => PromiseLike<void>): Promise_2<void>;
+function ensureDirWritableAsync(dirPath: string, confirm?: () => PromiseLike<void>): Promise<void>;
 
 // @public (undocumented)
-function ensureFileAsync(filePath: string): Promise_2<void>;
+function ensureFileAsync(filePath: string): Promise<void>;
 
 // @public (undocumented)
 export const ErrorBoundary: any;
@@ -997,6 +1000,9 @@ function extractExeIcon(exePath: string, destPath: string): Promise<void>;
 
 // @public (undocumented)
 function fileMD5(input: string | Buffer, progress?: (bytesProcessed: number, totalBytes: number) => void): Promise<string>;
+
+// @public
+function filter<T>(items: readonly T[], predicate: (item: T, index: number, length: number) => boolean | PromiseLike<boolean>): Promise<T[]>;
 
 // @public
 const finalizingDownload: ComplexActionCreator1<string, {
@@ -1050,7 +1056,7 @@ export class FlexLayout extends React_2.PureComponent<IProps_3, {}> {
 }
 
 // @public (undocumented)
-function forcePerm<T>(t: TFunction, op: () => Promise_2<T>, filePath?: string, maxTries?: number): Promise_2<T>;
+function forcePerm<T>(t: TFunction, op: () => Promise<T>, filePath?: string, maxTries?: number): Promise<T>;
 
 // @public (undocumented)
 const forgetExtension: reduxAct.ComplexActionCreator1<any, any, {}>;
@@ -1173,7 +1179,7 @@ declare namespace fs {
 export { fs }
 
 // @public (undocumented)
-const fsyncAsync: (fd: number) => Promise_2<void>;
+const fsyncAsync: (fd: number) => Promise<void>;
 
 // @public (undocumented)
 const gameById: ParametricSelector<IState, string, IGameStored> & {
@@ -1238,7 +1244,7 @@ class GameStoreNotFound extends Error {
 function generateCollectionSessionId(collectionId: string, profileId: string): string;
 
 // @public (undocumented)
-function genFSWrapperAsync<T extends (...args: any[]) => any>(func: T): (...args: any[]) => Promise_2<any>;
+function genFSWrapperAsync<T extends (...args: any[]) => any>(func: T): (...args: any[]) => any;
 
 // @public (undocumented)
 function getActivator(activatorId: string): IDeploymentMethod;
@@ -1469,7 +1475,7 @@ function getModType(id: string): IModType;
 // Warning: (ae-forgotten-export) The symbol "INormalizeParameters" needs to be exported by the entry point api.d.ts
 //
 // @public
-function getNormalizeFunc(testPath: string, parameters?: INormalizeParameters): Promise_2<Normalize>;
+function getNormalizeFunc(testPath: string, parameters?: INormalizeParameters): Promise<Normalize>;
 
 // Warning: (ae-forgotten-export) The symbol "ILog" needs to be exported by the entry point api.d.ts
 //
@@ -1626,19 +1632,19 @@ interface IApp {
 // @public
 interface IArchiveHandler {
     // (undocumented)
-    addFile?(filePath: string, sourcePath: string): Promise_2<void>;
+    addFile?(filePath: string, sourcePath: string): Promise<void>;
     // (undocumented)
-    create?(sourcePath: string): Promise_2<void>;
+    create?(sourcePath: string): Promise<void>;
     // (undocumented)
-    extractAll(outputPath: string): Promise_2<void>;
+    extractAll(outputPath: string): Promise<void>;
     // (undocumented)
-    extractFile?(filePath: string, outputPath: string): Promise_2<void>;
+    extractFile?(filePath: string, outputPath: string): Promise<void>;
     // (undocumented)
-    readDir(archPath: string): Promise_2<string[]>;
+    readDir(archPath: string): Promise<string[]>;
     // (undocumented)
     readFile?(filePath: string): NodeJS.ReadableStream;
     // (undocumented)
-    write?(): Promise_2<void>;
+    write?(): Promise<void>;
 }
 
 // @public
@@ -2223,18 +2229,18 @@ interface IExtension {
 // @public
 interface IExtensionApi {
     addMetaServer: (id: string, server: IServer) => void;
-    awaitUI: () => Promise_2<void>;
+    awaitUI: () => Promise<void>;
     clearStylesheet: () => void;
     closeDialog?: (id: string, actionKey?: string, input?: any) => void;
     deregisterProtocol: (protocol: string) => void;
     // (undocumented)
     dismissAllNotifications?: () => void;
     dismissNotification?: (id: string) => void;
-    emitAndAwait: <T = any>(eventName: string, ...args: any[]) => Promise_2<T>;
+    emitAndAwait: <T = any>(eventName: string, ...args: any[]) => Promise<T>;
     events: NodeJS.EventEmitter;
     ext: IExtensionApiExtension;
     extension?: IRegisteredExtension;
-    genMd5Hash: (data: string | Buffer, progressFunc?: (progress: number, total: number) => void) => Promise_2<IHashResult>;
+    genMd5Hash: (data: string | Buffer, progressFunc?: (progress: number, total: number) => void) => Promise<IHashResult>;
     getI18n: () => i18n;
     getLoadedExtensions: () => IRegisteredExtension[];
     getPath: (name: string) => string;
@@ -2243,31 +2249,31 @@ interface IExtensionApi {
     isOutdated: () => boolean;
     laterT: TFunction;
     locale: () => string;
-    lookupModMeta: (details: ILookupDetails, ignoreCache?: boolean) => Promise_2<ILookupResult[]>;
+    lookupModMeta: (details: ILookupDetails, ignoreCache?: boolean) => Promise<ILookupResult[]>;
     // Warning: (ae-forgotten-export) The symbol "ILookupOptions" needs to be exported by the entry point api.d.ts
     // Warning: (ae-forgotten-export) The symbol "IModLookupResult" needs to be exported by the entry point api.d.ts
-    lookupModReference: (ref: IModReference, options?: ILookupOptions) => Promise_2<IModLookupResult[]>;
+    lookupModReference: (ref: IModReference, options?: ILookupOptions) => Promise<IModLookupResult[]>;
     // (undocumented)
     NAMESPACE: string;
     onAsync: (eventName: string, listener: (...args: any[]) => PromiseLike<any>) => void;
     onStateChange?: <T = any>(path: string[], callback: StateChangeCallback<T>) => void;
-    openArchive: (archivePath: string, options?: IArchiveOptions, extension?: string) => Promise_2<Archive>;
+    openArchive: (archivePath: string, options?: IArchiveOptions, extension?: string) => Promise<Archive>;
     registerProtocol: IRegisterProtocol;
     registerRepositoryLookup: IRegisterRepositoryLookup;
-    runExecutable: (executable: string, args: string[], options: IRunOptions) => Promise_2<void>;
-    saveFile: (options: ISaveOptions) => Promise_2<string>;
-    saveModMeta: (modInfo: IModInfo) => Promise_2<void>;
-    selectDir: (options: IOpenOptions) => Promise_2<string>;
-    selectExecutable: (options: IOpenOptions) => Promise_2<string>;
-    selectFile: (options: IOpenOptions) => Promise_2<string>;
+    runExecutable: (executable: string, args: string[], options: IRunOptions) => Promise<void>;
+    saveFile: (options: ISaveOptions) => Promise<string>;
+    saveModMeta: (modInfo: IModInfo) => Promise<void>;
+    selectDir: (options: IOpenOptions) => Promise<string>;
+    selectExecutable: (options: IOpenOptions) => Promise<string>;
+    selectFile: (options: IOpenOptions) => Promise<string>;
     sendNotification?: (notification: INotification) => string;
     setStylesheet: (key: string, filePath: string) => void;
-    showDialog?: (type: DialogType, title: string, content: IDialogContent, actions: DialogActions, id?: string) => Promise_2<IDialogResult>;
+    showDialog?: (type: DialogType, title: string, content: IDialogContent, actions: DialogActions, id?: string) => Promise<IDialogResult>;
     showErrorNotification?: (message: string, detail: string | Error | any, options?: IErrorOptions) => void;
     store?: ThunkStore<any>;
     suppressNotification?: (id: string, suppress?: boolean) => void;
     translate: TFunction;
-    withPrePost: <T>(eventName: string, callback: (...args: any[]) => Promise_2<T>) => (...args: any[]) => Promise_2<T>;
+    withPrePost: <T>(eventName: string, callback: (...args: any[]) => Promise<T>) => (...args: any[]) => Promise<T>;
 }
 
 // Warning: (ae-forgotten-export) The symbol "INexusAPIExtension" needs to be exported by the entry point api.d.ts
@@ -2281,9 +2287,9 @@ interface IExtensionApiExtension extends INexusAPIExtension, IModsAPIExtension, 
     // (undocumented)
     addToHistory?: (stack: string, entry: IHistoryEvent) => void;
     // (undocumented)
-    awaitProfileSwitch?: () => Promise_2<string>;
+    awaitProfileSwitch?: () => Promise<string>;
     // (undocumented)
-    ensureLoggedIn?: () => Promise_2<void>;
+    ensureLoggedIn?: () => Promise<void>;
     // (undocumented)
     showHistory?: (stack: string) => void;
     // (undocumented)
@@ -2335,12 +2341,12 @@ interface IExtensionContext {
     registerLoadOrderPage: (gameEntry: IGameLoadOrderEntry) => void;
     registerMainPage: RegisterMainPage;
     registerMerge: (test: MergeTest, merge: MergeFunc, modType: string) => void;
-    registerMigration: (migrate: (oldVersion: string) => Promise_2<void>) => void;
+    registerMigration: (migrate: (oldVersion: string) => Promise<void>) => void;
     registerModSource: (id: string, name: string, onBrowse?: () => void, options?: IModSourceOptions) => void;
-    registerModType: (id: string, priority: number, isSupported: (gameId: string) => boolean, getPath: (game: IGame) => string, test: (installInstructions: IInstruction[]) => Promise_2<boolean>, options?: IModTypeOptions) => void;
+    registerModType: (id: string, priority: number, isSupported: (gameId: string) => boolean, getPath: (game: IGame) => string, test: (installInstructions: IInstruction[]) => Promise<boolean>, options?: IModTypeOptions) => void;
     registerOverlay: RegisterOverlay;
     registerPersistor: (hive: string, persistor: IPersistor, debounce?: number) => void;
-    registerPreview?: (priority: number, handler: (files: IPreviewFile[], allowPick: boolean) => Promise_2<IPreviewFile>) => void;
+    registerPreview?: (priority: number, handler: (files: IPreviewFile[], allowPick: boolean) => Promise<IPreviewFile>) => void;
     registerProfileFeature?: (featureId: string, type: string, icon: string, label: string, description: string, supported: () => boolean) => void;
     registerProfileFile?: (gameId: string, filePath: string | (() => PromiseLike<string[]>)) => void;
     registerReducer: (path: string[], spec: IReducerSpec) => void;
@@ -2426,7 +2432,7 @@ interface IGame extends ITool {
         [key: string]: boolean;
     };
     contributed?: string;
-    deploymentGate?: () => Promise_2<void>;
+    deploymentGate?: () => Promise<void>;
     details?: {
         [key: string]: any;
     };
@@ -2434,7 +2440,7 @@ interface IGame extends ITool {
     extensionPath?: string;
     final?: boolean;
     getGameVersion?: (gamePath: string, exePath: string) => PromiseLike<string>;
-    getInstalledVersion?: (discovery: IDiscoveryResult) => Promise_2<string>;
+    getInstalledVersion?: (discovery: IDiscoveryResult) => Promise<string>;
     getModPaths?: (gamePath: string) => {
         [typeId: string]: string;
     };
@@ -2447,11 +2453,11 @@ interface IGame extends ITool {
     };
     queryModPath: (gamePath: string) => string;
     requiresCleanup?: boolean;
-    requiresLauncher?: (gamePath: string, store?: string) => Promise_2<{
+    requiresLauncher?: (gamePath: string, store?: string) => Promise<{
         launcher: string;
         addInfo?: any;
     }>;
-    setup?: (discovery: IDiscoveryResult) => Promise_2<void>;
+    setup?: (discovery: IDiscoveryResult) => Promise<void>;
     supportedTools?: ITool[];
     version?: string;
 }
@@ -2490,21 +2496,21 @@ interface IGameModeSettings {
 
 // @public
 interface IGameStore {
-    allGames: () => Promise_2<IGameStoreEntry[]>;
-    findByAppId: (appId: string | string[]) => Promise_2<IGameStoreEntry>;
-    findByName: (appName: string) => Promise_2<IGameStoreEntry>;
-    getExecInfo?: (appId: any) => Promise_2<IExecInfo>;
-    getGameStorePath: () => Promise_2<string | undefined>;
-    getPosixPath?: (name: string) => Promise_2<string>;
+    allGames: () => Promise<IGameStoreEntry[]>;
+    findByAppId: (appId: string | string[]) => Promise<IGameStoreEntry>;
+    findByName: (appName: string) => Promise<IGameStoreEntry>;
+    getExecInfo?: (appId: any) => Promise<IExecInfo>;
+    getGameStorePath: () => Promise<string | undefined>;
+    getPosixPath?: (name: string) => Promise<string>;
     id: string;
-    identifyGame?: (gamePath: string, fallback: (gamePath: string) => PromiseLike<boolean>) => Promise_2<boolean>;
-    isGameInstalled?: (name: string) => Promise_2<boolean>;
-    isGameStoreInstalled?: () => Promise_2<boolean>;
-    launchGame: (appId: any, api?: IExtensionApi) => Promise_2<void>;
-    launchGameStore?: (api: IExtensionApi, parameters?: string[]) => Promise_2<void>;
+    identifyGame?: (gamePath: string, fallback: (gamePath: string) => PromiseLike<boolean>) => Promise<boolean>;
+    isGameInstalled?: (name: string) => Promise<boolean>;
+    isGameStoreInstalled?: () => Promise<boolean>;
+    launchGame: (appId: any, api?: IExtensionApi) => Promise<void>;
+    launchGameStore?: (api: IExtensionApi, parameters?: string[]) => Promise<void>;
     name?: string;
     priority?: number;
-    reloadGames?: () => Promise_2<void>;
+    reloadGames?: () => Promise<void>;
 }
 
 // @public
@@ -2952,6 +2958,11 @@ interface IMainPageOptions {
 }
 
 // @public (undocumented)
+interface IMapOptions {
+    concurrency?: number;
+}
+
+// @public (undocumented)
 interface IMergeFilter {
     // (undocumented)
     baseFiles: (deployedFiles: IDeployedFile[]) => Array<{
@@ -3138,7 +3149,7 @@ interface IModType {
     // (undocumented)
     priority: number;
     // (undocumented)
-    test: (installInstructions: IInstruction[]) => Promise_2<boolean>;
+    test: (installInstructions: IInstruction[]) => Promise<boolean>;
     // (undocumented)
     typeId: string;
 }
@@ -3214,6 +3225,18 @@ interface INotificationState {
     dialogs: IDialog[];
     // (undocumented)
     notifications: INotification[];
+}
+
+// @public
+interface Inspection<T> {
+    // (undocumented)
+    isFulfilled(): boolean;
+    // (undocumented)
+    isRejected(): boolean;
+    // (undocumented)
+    reason(): unknown;
+    // (undocumented)
+    value(): T;
 }
 
 // @public
@@ -3474,7 +3497,7 @@ interface IRegisterProtocol {
 // @public (undocumented)
 interface IRegisterRepositoryLookup {
     // (undocumented)
-    (repositoryId: string, preferOverMD5: boolean, callback: (id: IModRepoId) => Promise_2<IModLookupResult[]>): any;
+    (repositoryId: string, preferOverMD5: boolean, callback: (id: IModRepoId) => Promise<IModLookupResult[]>): any;
 }
 
 // @public (undocumented)
@@ -3589,7 +3612,7 @@ clearCache: () => void;
 const isCollectionPhaseComplete: (state: IState, phase: number) => boolean;
 
 // @public (undocumented)
-function isDirectoryAsync(dirPath: string): Promise_2<boolean>;
+function isDirectoryAsync(dirPath: string): Promise<boolean>;
 
 // @public
 interface ISession {
@@ -4210,7 +4233,7 @@ interface ITool {
     name: string;
     onStart?: "hide" | "hide_recover" | "close";
     parameters?: string[];
-    queryPath?: () => string | Promise_2<string | IGameStoreEntry>;
+    queryPath?: () => string | Promise<string | IGameStoreEntry>;
     relative?: boolean;
     requiredFiles: string[];
     shell?: boolean;
@@ -4399,7 +4422,7 @@ function LazyComponent<T>(load: () => any): (props: any) => JSX.Element;
 function lazyRequire<T>(delayed: () => T, exportId?: string): T;
 
 // @public (undocumented)
-function linkAsync(src: string, dest: string, options?: ILinkFileOptions): Promise_2<void>;
+function linkAsync(src: string, dest: string, options?: ILinkFileOptions): Promise<void>;
 
 // Warning: (ae-forgotten-export) The symbol "ICategoryDictionary" needs to be exported by the entry point api.d.ts
 //
@@ -4432,7 +4455,7 @@ export function log(level: Level, message: string, metadata?: unknown): void;
 function lookupFromDownload(download: IDownload): IModLookupInfo;
 
 // @public (undocumented)
-const lstatAsync: (path: string) => Promise_2<fs_2.Stats>;
+const lstatAsync: (path: string) => Promise<fs_2.Stats>;
 
 // @public (undocumented)
 export const MainContext: React_3.Context<IComponentContext>;
@@ -4449,7 +4472,7 @@ export const MainPage: typeof MainPageInner & {
 const mainPage: (state: IState) => string;
 
 // @public (undocumented)
-function makeFileWritableAsync(filePath: string): Promise_2<void>;
+function makeFileWritableAsync(filePath: string): Promise<void>;
 
 // Warning: (ae-forgotten-export) The symbol "GetSelection" needs to be exported by the entry point api.d.ts
 //
@@ -4474,7 +4497,7 @@ function makeOverlayableDictionary<KeyT extends string | number | symbol, ValueT
 }, deduceLayer: (key: KeyT, extraArg: any) => string): Overlayable<KeyT, ValueT>;
 
 // @public
-function makeQueue<T>(): (func: () => PromiseLike<T>, tryOnly: boolean) => Bluebird<T>;
+function makeQueue<T>(): (func: () => PromiseLike<T>, tryOnly: boolean) => Promise<T>;
 
 // @public
 function makeReactive<T extends object>(value: T): T;
@@ -4487,6 +4510,12 @@ function makeUnique<T>(input: T[]): T[];
 
 // @public
 function makeUniqueByKey<T>(input: T[], key: (item: T) => string): T[];
+
+// @public
+function map<T, U>(items: readonly T[], mapper: AsyncMapper<T, U>, options?: IMapOptions): Promise<U[]>;
+
+// @public
+function mapSeries<T, U>(items: readonly T[], mapper: AsyncMapper<T, U>): Promise<U[]>;
 
 // @public
 function merge<T extends object>(state: T, path: Array<string | number>, value: any): T;
@@ -4514,10 +4543,10 @@ class MissingInterpreter extends Error {
 }
 
 // @public (undocumented)
-const mkdirAsync: (path: string) => Promise_2<void>;
+const mkdirAsync: (path: string) => Promise<void>;
 
 // @public (undocumented)
-const mkdirsAsync: (path: string) => Promise_2<void>;
+const mkdirsAsync: (path: string) => Promise<void>;
 
 // @public (undocumented)
 export class Modal extends React_2.PureComponent<typeof Modal_2.prototype.props, {}> {
@@ -4578,10 +4607,10 @@ const modsForGame: (state: IState, gameId: string) => {
 export const More: React_2.ComponentClass<IMoreProps>;
 
 // @public (undocumented)
-const moveAsync: (src: string, dest: string, options?: fs_2.MoveOptions) => Promise_2<void>;
+const moveAsync: (src: string, dest: string, options?: fs_2.MoveOptions) => Promise<void>;
 
 // @public
-function moveRenameAsync(src: string, dest: string): Promise_2<string>;
+function moveRenameAsync(src: string, dest: string): Promise<string>;
 
 // @public (undocumented)
 function mutateSafe<T>(state: T, path: Array<string | number>, value: any): void;
@@ -4685,11 +4714,19 @@ function objDiff(lhs: any, rhs: any, skip?: string[]): Record<string, any>;
 // @public
 function onceCB<T extends Function>(func: T): T;
 
-// @public @deprecated (undocumented)
-function open_2(target: string, _wait?: boolean): Promise_2<void>;
+// Warning: (ae-forgotten-export) The symbol "ErrorConstructor_2" needs to be exported by the entry point api.d.ts
+//
+// @public
+function only<E extends Error, T>(ErrorClass: ErrorConstructor_2<E>, handler: (err: E) => T | PromiseLike<T>): (err: unknown) => T | PromiseLike<T>;
 
 // @public (undocumented)
-const openAsync: (path: string, flags: string | number, mode?: number) => Promise_2<number>;
+function only<T>(predicate: Record<string, unknown>, handler: (err: any) => T | PromiseLike<T>): (err: unknown) => T | PromiseLike<T>;
+
+// @public @deprecated (undocumented)
+function open_2(target: string, _wait?: boolean): Promise<void>;
+
+// @public (undocumented)
+const openAsync: (path: string, flags: string | number, mode?: number) => Promise<number>;
 
 // @public (undocumented)
 export class OptionsFilter implements ITableFilter {
@@ -4827,8 +4864,6 @@ export class ProgressBar extends React_2.PureComponent<IBaseProps_9, IProgressBa
 // @public (undocumented)
 type ProgressDelegate = (perc: number) => void;
 
-export { Promise_2 as Promise }
-
 // @public (undocumented)
 type PropsCallback = () => {
     [key: string]: unknown;
@@ -4870,25 +4905,28 @@ export const RadialProgress: React_2.ComponentClass<IBaseProps_10>;
 function rawRequest(apiURL: string, options?: IRequestOptions): Promise<string | Buffer>;
 
 // @public (undocumented)
-const readAsync: <BufferT>(...args: any[]) => Promise_2<{
+const readAsync: <BufferT>(...args: any[]) => Promise<{
     bytesRead: number;
     buffer: BufferT;
 }>;
 
 // @public (undocumented)
-const readdirAsync: (path: string) => Promise_2<string[]>;
+const readdirAsync: (path: string) => Promise<string[]>;
 
 // @public (undocumented)
-function readExtensibleDir(extType: ExtensionType, bundledPath: string, customPath: string): Promise_2<any[]>;
+function readExtensibleDir(extType: ExtensionType, bundledPath: string, customPath: string): Promise<any[]>;
 
 // @public (undocumented)
-const readFileAsync: (...args: any[]) => Promise_2<any>;
+const readFileAsync: (...args: any[]) => Promise<any>;
 
 // @public
 function readFileBOM(filePath: string, fallbackEncoding: string): Promise<string>;
 
 // @public (undocumented)
-function readlinkAsync(linkPath: string): Promise_2<string>;
+function readlinkAsync(linkPath: string): Promise<string>;
+
+// @public
+function reduce<T, U>(items: readonly T[], reducer: (acc: U, item: T, index: number, length: number) => U | PromiseLike<U>, initialValue?: U): Promise<U>;
 
 // @public (undocumented)
 class ReduxProp<T> {
@@ -4902,6 +4940,9 @@ class ReduxProp<T> {
     // (undocumented)
     detach(component: IUpdateable): void;
 }
+
+// @public
+function reflect<T>(promise: PromiseLike<T>): Promise<Inspection<T>>;
 
 // @public (undocumented)
 type RegisterAction = (group: string, position: number, iconOrComponent: string | React_2.ComponentType<any>, options: IActionOptions, titleOrProps?: string | PropsCallback, actionOrCondition?: (instanceIds?: string[]) => void | boolean, condition?: (instanceIds?: string[]) => boolean | string) => void;
@@ -4942,7 +4983,7 @@ function rehydrate<T extends object>(state: T, inbound: any, path: string[], rep
 function relativeTime(date: Date, t: TFunction): string;
 
 // @public (undocumented)
-function removeAsync(remPath: string, options?: IRemoveFileOptions): Promise_2<void>;
+function removeAsync(remPath: string, options?: IRemoveFileOptions): Promise<void>;
 
 // @public (undocumented)
 const removeCategory: reduxAct.ComplexActionCreator2<string, string, {
@@ -4992,7 +5033,7 @@ function removeValue<T>(state: T, path: Array<string | number>, value: any): T;
 function removeValueIf<T extends object>(state: T, path: Array<string | number>, predicate: (element: any) => boolean): T;
 
 // @public (undocumented)
-function renameAsync(sourcePath: string, destinationPath: string): Promise_2<void>;
+function renameAsync(sourcePath: string, destinationPath: string): Promise<void>;
 
 // @public (undocumented)
 const renameCategory: reduxAct.ComplexActionCreator3<string, string, string, {
@@ -5054,7 +5095,7 @@ function resolveWineLocalAppData(prefixPath: string): Promise<string>;
 type Revertability = "yes" | "never" | "invalid";
 
 // @public (undocumented)
-function rmdirAsync(dirPath: string): Promise_2<void>;
+function rmdirAsync(dirPath: string): Promise<void>;
 
 // Warning: (ae-forgotten-export) The symbol "IElevatedIpc" needs to be exported by the entry point api.d.ts
 //
@@ -5062,7 +5103,7 @@ function rmdirAsync(dirPath: string): Promise_2<void>;
 function runElevated(ipcPath: string, func: (ipc: IElevatedIpc, req: NodeJS.Require) => void | PromiseLike<void>, args?: Record<string, unknown>): Promise<string>;
 
 // @public (undocumented)
-function runThreaded(func: (...args: any[]) => any, moduleBase: string, ...args: any[]): Promise_2<any>;
+function runThreaded(func: (...args: any[]) => any, moduleBase: string, ...args: any[]): Promise<any>;
 
 // @public
 function sanitizeCSSId(input: string): string;
@@ -5535,7 +5576,7 @@ const setModInstallationPath: reduxAct.ComplexActionCreator3<string, string, str
 }, {}>;
 
 // @public (undocumented)
-const setModsEnabled: (api: IExtensionApi, profileIdIn: string, modIdsIn: string[], enableIn: boolean, optionsIn?: IEnableOptions) => Bluebird<void>;
+const setModsEnabled: (api: IExtensionApi, profileIdIn: string, modIdsIn: string[], enableIn: boolean, optionsIn?: IEnableOptions) => Promise<void>;
 
 // Warning: (ae-forgotten-export) The symbol "ModState" needs to be exported by the entry point api.d.ts
 //
@@ -5752,7 +5793,7 @@ const shouldShowPremiumAd: (state: IState) => boolean;
 function showActivity<S>(dispatch: ThunkDispatch<IState, null, Redux.Action>, message: string, id?: string): void;
 
 // @public
-function showDialog(type: DialogType, title: string, content: IDialogContent, actions: DialogActions, inId?: string): (dispatch: any) => Promise_2<IDialogResult>;
+function showDialog(type: DialogType, title: string, content: IDialogContent, actions: DialogActions, inId?: string): (dispatch: any) => Promise<IDialogResult>;
 
 // @public
 function showError(dispatch: ThunkDispatch<IState, null, Redux.Action>, title: string, details?: string | Error | any, options?: IErrorOptions): void;
@@ -5858,7 +5899,7 @@ class StarterInfo implements IStarterInfo {
     // Warning: (ae-forgotten-export) The symbol "OnShowErrorFunc" needs to be exported by the entry point api.d.ts
     //
     // (undocumented)
-    static run(info: IStarterInfo, api: IExtensionApi, onShowError: OnShowErrorFunc): Promise_2<any>;
+    static run(info: IStarterInfo, api: IExtensionApi, onShowError: OnShowErrorFunc): Promise<any>;
     // (undocumented)
     shell: boolean;
     // (undocumented)
@@ -5875,13 +5916,13 @@ class StarterInfo implements IStarterInfo {
 const startNotification: ComplexActionCreator1<any, any, {}>;
 
 // @public (undocumented)
-const statAsync: (path: string) => Promise_2<fs_2.Stats>;
+const statAsync: (path: string) => Promise<fs_2.Stats>;
 
 // @public (undocumented)
 type StateChangeCallback<T = any> = (previous: T, current: T) => void;
 
 // @public (undocumented)
-const statSilentAsync: (path: string) => Promise_2<fs_2.Stats>;
+const statSilentAsync: (path: string) => Promise<fs_2.Stats>;
 
 // Warning: (ae-forgotten-export) The symbol "ISteps" needs to be exported by the entry point api.d.ts
 //
@@ -5910,7 +5951,7 @@ suppress: boolean;
 }, {}>;
 
 // @public (undocumented)
-const symlinkAsync: (srcpath: string, dstpath: string, type?: string) => Promise_2<void>;
+const symlinkAsync: (srcpath: string, dstpath: string, type?: string) => Promise<void>;
 
 // Warning: (ae-forgotten-export) The symbol "IBaseProps_11" needs to be exported by the entry point api.d.ts
 // Warning: (ae-forgotten-export) The symbol "IExtensibleProps" needs to be exported by the entry point api.d.ts
@@ -5999,7 +6040,7 @@ interface ThunkStore<S> extends Redux.Store<S> {
 export function Timer(props: ITimerProps): JSX.Element;
 
 // @public (undocumented)
-function toBlue<T, ArgsT extends any[]>(func: (...args: ArgsT) => Promise<T>): (...args: ArgsT) => Bluebird<T>;
+function toBlue<T, ArgsT extends any[]>(func: (...args: ArgsT) => Promise<T>): (...args: ArgsT) => Promise<T>;
 
 // @public (undocumented)
 type ToDoType = "settings" | "search" | "workaround" | "more";
@@ -6062,7 +6103,7 @@ declare namespace tooltip {
 export { tooltip }
 
 // @public (undocumented)
-function toPromise<ResT>(func: (cb: any) => void): Bluebird<ResT>;
+function toPromise<ResT>(func: (cb: any) => void): Promise<ResT>;
 
 // @public (undocumented)
 function triggerDialogLink(id: string, idx: number): void;
@@ -6309,7 +6350,7 @@ export { types }
 function unique<T, U>(input: T[], keyFunc?: (item: T) => U): T[];
 
 // @public (undocumented)
-function unlinkAsync(filePath: string, options?: IRemoveFileOptions): Promise_2<void>;
+function unlinkAsync(filePath: string, options?: IRemoveFileOptions): Promise<void>;
 
 // @public (undocumented)
 const UPDATE_CHANNELS: readonly ["stable", "beta", "next", "none"];
@@ -6501,6 +6542,16 @@ declare namespace util {
         CollectionsDraftedEvent,
         CollectionsDraftUploadedEvent,
         CollectionsDraftUpdateUploadedEvent,
+        each,
+        filter,
+        map,
+        mapSeries,
+        only,
+        reduce,
+        reflect,
+        AsyncMapper,
+        Inspection,
+        IMapOptions,
         TextGroup,
         calcDuration,
         showSuccess,
@@ -6537,7 +6588,7 @@ declare namespace util {
 export { util }
 
 // @public (undocumented)
-const utimesAsync: (path: string, atime: number, mtime: number) => Promise_2<void>;
+const utimesAsync: (path: string, atime: number, mtime: number) => Promise<void>;
 
 // @public (undocumented)
 type ValidationState = "success" | "warning" | "error";
@@ -6586,16 +6637,16 @@ export class Webview extends React_2.Component<IWebviewProps & IWebView, {}> {
 const willRemoveProfile: reduxAct.ComplexActionCreator1<unknown, unknown, {}>;
 
 // @public
-function withContext(id: string, value: string, fun: () => Promise_2<any>): Promise<any>;
+function withContext(id: string, value: string, fun: () => Promise<any>): Promise<any>;
 
 // @public (undocumented)
-const withTmpDir: (...args: any[]) => Promise_2<any>;
+const withTmpDir: (...args: any[]) => any;
 
 // @public (undocumented)
-function withTmpDirImpl<T>(cb: (tmpPath: string) => Promise_2<T>): Promise_2<T>;
+function withTmpDirImpl<T>(cb: (tmpPath: string) => Promise<T>): Promise<T>;
 
 // @public (undocumented)
-const withTmpFile: (...args: any[]) => Promise_2<any>;
+const withTmpFile: (...args: any[]) => any;
 
 // Warning: (ae-forgotten-export) The symbol "TrackedFunction" needs to be exported by the entry point api.d.ts
 // Warning: (ae-forgotten-export) The symbol "TrackedActivityOptions" needs to be exported by the entry point api.d.ts
@@ -6604,16 +6655,16 @@ const withTmpFile: (...args: any[]) => Promise_2<any>;
 function withTrackedActivity<T>(tracerName: string, spanName: string, attributes: Record<string, string | number | boolean>, fun: TrackedFunction<T>, options?: TrackedActivityOptions): Promise<T>;
 
 // @public (undocumented)
-const writeAsync: <BufferT>(...args: any[]) => Promise_2<{
+const writeAsync: <BufferT>(...args: any[]) => Promise<{
     bytesWritten: number;
     buffer: BufferT;
 }>;
 
 // @public (undocumented)
-const writeFileAsync: (file: string, data: any, options?: fs_2.WriteFileOptions) => Promise_2<void>;
+const writeFileAsync: (file: string, data: any, options?: fs_2.WriteFileOptions) => Promise<void>;
 
 // @public (undocumented)
-function writeFileAtomic(filePath: string, input: string | Buffer): Promise_2<void>;
+function writeFileAtomic(filePath: string, input: string | Buffer): Promise<void>;
 
 // Warning: (ae-forgotten-export) The symbol "IZoomableImageProps" needs to be exported by the entry point api.d.ts
 //

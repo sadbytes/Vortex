@@ -1,4 +1,3 @@
-import type PromiseBB from "bluebird";
 import * as React from "react";
 import { Alert, ControlLabel, FormGroup, HelpBlock } from "react-bootstrap";
 import { withTranslation } from "react-i18next";
@@ -30,7 +29,7 @@ interface IActionProps {
     title: string,
     content: IDialogContent,
     actions: DialogActions,
-  ) => PromiseBB<IDialogResult>;
+  ) => Promise<IDialogResult>;
 }
 
 type IProps = IBaseProps & IActionProps & IConnectedProps;

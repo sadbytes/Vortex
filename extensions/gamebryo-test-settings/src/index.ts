@@ -1,7 +1,6 @@
 import * as path from "path";
 
 import { actions, fs, log, selectors, types, util } from "@nexusmods/vortex-api";
-import Promise from "bluebird";
 import * as Redux from "redux";
 import IniParser, { IniFile, WinapiFormat } from "vortex-parse-ini";
 
@@ -119,16 +118,20 @@ function testSkyrimFontsImpl(context: types.IExtensionContext) {
       : context.api
           .openArchive(interfacePath)
           .then((archive: util.Archive) =>
-            archive.readDir("interface").tap(() => {
-              // We don't need the archive open anymore. Usually we would just
-              //  leave it to the GC to release the file handle whenever V8 decides
-              //  to do it; but in this case the user might want to replace it entirely
-              //  with a mod (stupid I know) https://github.com/Nexus-Mods/Vortex/issues/11672
-              if (archive["mHandler"]?.closeArchive !== undefined) {
-                archive["mHandler"].closeArchive();
-              }
-              archive = null;
-            }),
+            archive.readDir("interface").then((__v) =>
+              Promise.resolve(
+                (() => {
+                  // We don't need the archive open anymore. Usually we would just
+                  //  leave it to the GC to release the file handle whenever V8 decides
+                  //  to do it; but in this case the user might want to replace it entirely
+                  //  with a mod (stupid I know) https://github.com/Nexus-Mods/Vortex/issues/11672
+                  if (archive["mHandler"]?.closeArchive !== undefined) {
+                    archive["mHandler"].closeArchive();
+                  }
+                  archive = null;
+                })(),
+              ).then(() => __v),
+            ),
           )
           .then((files: string[]) => {
             defaultFonts[gameId] = new Set<string>(
@@ -181,8 +184,8 @@ function testSkyrimFontsImpl(context: types.IExtensionContext) {
         severity: "error" as types.ProblemSeverity,
       });
     })
-    .catch(util.NotSupportedError, () => Promise.resolve(undefined))
-    .catch(util.ProcessCanceled, () => Promise.resolve(undefined))
+    .catch(util.only(util.NotSupportedError, () => Promise.resolve(undefined)))
+    .catch(util.only(util.ProcessCanceled, () => Promise.resolve(undefined)))
     .catch((err: Error) => {
       return Promise.resolve({
         description: {

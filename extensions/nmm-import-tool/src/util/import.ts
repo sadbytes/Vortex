@@ -1,7 +1,6 @@
 import * as path from "path";
 
 import { actions, fs, selectors, types, util } from "@nexusmods/vortex-api";
-import Promise from "bluebird";
 import { generate as shortid } from "shortid";
 
 import { IModEntry } from "../types/nmmEntries";
@@ -149,32 +148,40 @@ function importArchives(
       const importedArchives: IModEntry[] = [];
       trace.log("info", "transfer archive files");
       const downloadPath = selectors.downloadPath(state);
-      return Promise.map(mods, (mod) =>
-        enhance(modsPath, mod, categories, makeVortexCategory),
-      ).then((modsEx) =>
-        Promise.mapSeries(modsEx, (mod, idx) => {
-          trace.log("info", "transferring", JSON.stringify(mod.modFilename, undefined, 2));
-          progress(mod.modName, idx);
-          const archivePath = path.join(mod.archivePath, mod.modFilename);
-          return fs
-            .statAsync(archivePath)
-            .then((stats) => transferArchiveFile(archivePath, downloadPath, mod, stats.size))
-            .tap(() => importedArchives.push(mod))
-            .catch((err) => {
-              trace.log("error", "Failed to import mod archive", archivePath + " - " + err.message);
-              errors.push(mod.modFilename);
-            });
-        }).then(() => {
-          trace.log("info", "Finished transferring mod archives");
-          if (importedArchives.length > 0) {
-            addMetaData(gameId, importedArchives, api);
-            api.events.emit(
-              "did-import-downloads",
-              importedArchives.map((arch) => arch.archiveId),
-            );
-          }
-        }),
-      );
+      return util
+        .map(mods, (mod) => enhance(modsPath, mod, categories, makeVortexCategory))
+        .then((modsEx) =>
+          util
+            .mapSeries(modsEx, (mod, idx) => {
+              trace.log("info", "transferring", JSON.stringify(mod.modFilename, undefined, 2));
+              progress(mod.modName, idx);
+              const archivePath = path.join(mod.archivePath, mod.modFilename);
+              return fs
+                .statAsync(archivePath)
+                .then((stats) => transferArchiveFile(archivePath, downloadPath, mod, stats.size))
+                .then((__v) =>
+                  Promise.resolve((() => importedArchives.push(mod))()).then(() => __v),
+                )
+                .catch((err) => {
+                  trace.log(
+                    "error",
+                    "Failed to import mod archive",
+                    archivePath + " - " + err.message,
+                  );
+                  errors.push(mod.modFilename);
+                });
+            })
+            .then(() => {
+              trace.log("info", "Finished transferring mod archives");
+              if (importedArchives.length > 0) {
+                addMetaData(gameId, importedArchives, api);
+                api.events.emit(
+                  "did-import-downloads",
+                  importedArchives.map((arch) => arch.archiveId),
+                );
+              }
+            }),
+        );
     })
     .then(() => {
       trace.finish();

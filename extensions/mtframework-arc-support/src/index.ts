@@ -2,7 +2,6 @@ import * as fs from "fs";
 import * as path from "path";
 
 import { log, selectors, types } from "@nexusmods/vortex-api";
-import Promise from "bluebird";
 
 import ARCWrapper from "./ARCWrapper";
 import AttribDashlet from "./AttribDashlet";

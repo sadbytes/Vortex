@@ -189,7 +189,7 @@ function mapDispatchToProps(dispatch: ThunkDispatch<any, null, Redux.Action>): I
     onShowError: (message: string, details?: string, allowReport?: boolean) =>
       showError(dispatch, message, details, { allowReport }),
     onShowDialog: (type, title, content, dialogActions) =>
-      // showDialog thunk returns Bluebird — see comment in notifications.ts
+      // normalize the dispatched showDialog thunk result to a native promise
       Promise.resolve(dispatch(showDialog(type, title, content, dialogActions))),
     onSetConfirmPurge: (enabled: boolean) => dispatch(setConfirmPurge(enabled)),
     onShowWarning: (message: string, dialogAction: INotificationAction, id: string) =>

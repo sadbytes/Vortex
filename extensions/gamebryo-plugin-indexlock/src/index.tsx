@@ -1,5 +1,4 @@
 import { selectors, types, util } from "@nexusmods/vortex-api";
-import Promise from "bluebird";
 import * as React from "react";
 
 import LockIndex from "./LockIndex";

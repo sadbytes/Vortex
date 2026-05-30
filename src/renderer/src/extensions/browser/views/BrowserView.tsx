@@ -1,7 +1,6 @@
 import * as nodeUrl from "url";
 
 import { getErrorMessageOrDefault } from "@vortex/shared";
-import PromiseBB from "bluebird";
 import { clipboard } from "electron";
 import * as _ from "lodash";
 import * as React from "react";
@@ -91,7 +90,7 @@ class BrowserView extends ComponentEx<IProps, IComponentState> {
         if (loading !== this.state.loading) {
           this.nextState.loading = loading;
         }
-        return PromiseBB.resolve();
+        return Promise.resolve();
       },
       100,
       false,

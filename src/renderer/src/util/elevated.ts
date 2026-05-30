@@ -128,7 +128,7 @@ function elevatedMain(
  *                        the global require. Regular require calls will not work in production
  *                        builds
  * @param {Object} args arguments to be passed into the elevated process
- * @returns {Bluebird<string>} a promise that will be resolved as soon as the process is started
+ * @returns {Promise<string>} a promise that will be resolved as soon as the process is started
  *                             (which happens after the user confirmed elevation). It resolves to
  *                             the path of the tmpFile we had to create. If the caller can figure
  *                             out when the process is done (using ipc) it should delete it

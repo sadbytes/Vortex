@@ -10,12 +10,12 @@ import type {
 } from "@nexusmods/nexus-api";
 import type NexusT from "@nexusmods/nexus-api";
 import { RateLimitError } from "@nexusmods/nexus-api";
-import PromiseBB from "bluebird";
 import type { TFunction } from "i18next";
 import type * as Redux from "redux";
 import * as semver from "semver";
 
 import type { IExtensionApi } from "../../../types/IExtensionContext";
+import { only } from "../../../util/asyncpromise";
 import { log } from "../../../util/log";
 import { getSafe } from "../../../util/storeHelper";
 import { batchDispatch, truthy } from "../../../util/util";
@@ -24,7 +24,6 @@ import { setModAttribute } from "../../mod_management/actions/mods";
 import type { IMod } from "../../mod_management/types/IMod";
 import { setLastUpdateCheck } from "../actions/session";
 import { nexusGameId } from "./convertGameId";
-
 export const ONE_MINUTE = 60 * 1000;
 export const ONE_DAY = 24 * 60 * ONE_MINUTE;
 export const ONE_WEEK = 7 * ONE_DAY;
@@ -38,14 +37,14 @@ const UPDATE_CHECK_TIMEOUT = 5 * ONE_MINUTE;
  * @param {NexusT} nexus
  * @param {string} gameId game to fetch for
  * @param {number} minAge timestamp of the least recently updated mod we're interested in
- * @returns {PromiseBB<IUpdateEntry[]>}
+ * @returns {Promise<IUpdateEntry[]>}
  */
 export function fetchRecentUpdates(
   store: Redux.Store<any>,
   nexus: NexusT,
   gameId: string,
   minAge: number,
-): PromiseBB<IUpdateEntry[]> {
+): Promise<IUpdateEntry[]> {
   const state = store.getState();
   const now = Date.now();
   const lastUpdate = getSafe(state, ["session", "nexus", "lastUpdate", gameId], {
@@ -58,7 +57,7 @@ export function fetchRecentUpdates(
 
   if (timeSinceUpdate < UPDATE_CHECK_TIMEOUT && now - minAge < lastUpdate.range) {
     // don't fetch same or smaller range again within 5 minutes
-    return PromiseBB.resolve(
+    return Promise.resolve(
       getSafe(state, ["session", "nexus", "lastUpdate", gameId, "updateList"], []),
     );
   } else {
@@ -75,13 +74,13 @@ export function fetchRecentUpdates(
 
     log("debug", "[update check] using range", { gameId, period });
 
-    return PromiseBB.resolve(
+    return Promise.resolve(
       nexus.getRecentlyUpdatedMods(period, nexusGameId(gameById(state, gameId), gameId)),
     ).then((recentUpdates) => {
       // store 5 minutes ago for the time of the last update check, since
       // the list is cached and might be that outdated
       store.dispatch(setLastUpdateCheck(gameId, now - 5 * ONE_MINUTE, range, recentUpdates));
-      return PromiseBB.resolve(recentUpdates);
+      return Promise.resolve(recentUpdates);
     });
   }
 }
@@ -95,7 +94,7 @@ export function fetchRecentUpdates(
  * @param {number} newestFileId
  * @param {string} version
  * @param {number} uploadedTimestamp
- * @return {PromiseBB<IFileInfo>}
+ * @return {Promise<IFileInfo>}
  *
  */
 export function checkModVersion(
@@ -103,20 +102,20 @@ export function checkModVersion(
   nexus: NexusT,
   gameMode: string,
   mod: IMod,
-): PromiseBB<void> {
+): Promise<void> {
   const nexusModId: number = parseInt(getSafe(mod.attributes, ["modId"], undefined), 10);
 
   if (isNaN(nexusModId)) {
-    return PromiseBB.resolve();
+    return Promise.resolve();
   }
 
   const gameId = getSafe(mod.attributes, ["downloadGame"], undefined) || gameMode;
   const game = gameById(store.getState(), gameId);
   const fallBackGameId = gameId === "site" ? "site" : gameId;
 
-  return PromiseBB.resolve(nexus.getModFiles(nexusModId, nexusGameId(game, fallBackGameId)))
+  return Promise.resolve(nexus.getModFiles(nexusModId, nexusGameId(game, fallBackGameId)))
     .then((result) => updateFileAttributes(store.dispatch, gameMode, mod, result))
-    .tapCatch((err) => {
+    .catch((err: any) => {
       log("warn", "dropping update info", {
         gameMode,
         id: mod.id,
@@ -125,6 +124,7 @@ export function checkModVersion(
       if ([403, 404].indexOf(err.statusCode) !== -1) {
         setNoUpdateAttributes(store.dispatch, gameMode, mod);
       }
+      throw err;
     });
 }
 
@@ -367,16 +367,16 @@ export function retrieveModInfo(
   gameMode: string,
   mod: IMod,
   t: TFunction,
-): PromiseBB<void> {
+): Promise<void> {
   const store = api.store;
   const nexusModId: string = getSafe(mod.attributes, ["modId"], undefined);
   if (nexusModId === undefined || nexusModId.length === 0) {
-    return PromiseBB.resolve();
+    return Promise.resolve();
   }
   const gameId = getSafe(mod.attributes, ["downloadGame"], gameMode);
   const nexusIdNum = parseInt(nexusModId, 10);
   // if the endorsement state is unknown, request it
-  return PromiseBB.resolve(
+  return Promise.resolve(
     nexus.getModInfo(nexusIdNum, nexusGameId(gameById(store.getState(), gameId))),
   )
     .then((modInfo: IModInfo) => {
@@ -384,14 +384,16 @@ export function retrieveModInfo(
         updateModAttributes(store.dispatch, gameMode, mod, modInfo);
       }
     })
-    .catch(RateLimitError, (err) => {
-      api.sendNotification({
-        id: "rate-limit-exceeded",
-        type: "warning",
-        title: "Rate-limit exceeded",
-        message: "You wont be able to use network features until the next full hour.",
-      });
-    })
+    .catch(
+      only(RateLimitError, (err) => {
+        api.sendNotification({
+          id: "rate-limit-exceeded",
+          type: "warning",
+          title: "Rate-limit exceeded",
+          message: "You wont be able to use network features until the next full hour.",
+        });
+      }),
+    )
     .catch((err: NexusError) => {
       if (err.statusCode === 404) {
         return;

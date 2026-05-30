@@ -19,7 +19,6 @@
     "@types/react-router": "catalog:",
     "@types/react-sortable-tree": "catalog:",
     "@types/semver": "catalog:",
-    "bluebird": "catalog:",
     "copyfiles": "catalog:",
     "cytoscape": "catalog:",
     "cytoscape-cose-bilkent": "catalog:",

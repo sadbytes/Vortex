@@ -29,7 +29,6 @@ import {
   unknownToError,
 } from "@vortex/shared";
 import { AlreadyDownloaded, DownloadIsHTML } from "@vortex/shared/errors";
-import BluebirdPromise from "bluebird";
 import type { TFunction } from "i18next";
 import jwt from "jsonwebtoken";
 import * as _ from "lodash";
@@ -46,6 +45,7 @@ import {
 import { log } from "../../logging";
 import type { IExtensionApi, ThunkStore } from "../../types/IExtensionContext";
 import type { IMod, IState } from "../../types/IState";
+import { map, only, reduce } from "../../util/asyncpromise";
 import {
   DataInvalid,
   HTTPError,
@@ -83,7 +83,6 @@ import { FULL_REVISION_INFO, MOD_FILE_INFO } from "./util/graphQueries";
 import type { ITokenReply } from "./util/oauth";
 import OAuth from "./util/oauth";
 import { makeFileUID } from "./util/UIDs";
-
 const UPDATE_CHECK_DELAY = 60 * 60 * 1000;
 
 const GAMES_JSON_URL = "https://data.nexusmods.com/file/nexus-data/games.json";
@@ -330,9 +329,9 @@ export function oauthCallback(api: IExtensionApi, code: string, state?: string) 
   return oauth.receiveCode(code, state);
 }
 
-export function ensureLoggedIn(api: IExtensionApi): BluebirdPromise<void> {
+export function ensureLoggedIn(api: IExtensionApi): Promise<void> {
   if (!isLoggedIn(api.getState())) {
-    return new BluebirdPromise((resolve, reject) => {
+    return new Promise((resolve, reject) => {
       api.events.on("did-login", (err: Error) => {
         if (err !== null) {
           reject(err);
@@ -344,7 +343,7 @@ export function ensureLoggedIn(api: IExtensionApi): BluebirdPromise<void> {
       api.store.dispatch(setDialogVisible("login-dialog"));
     });
   } else {
-    return BluebirdPromise.resolve();
+    return Promise.resolve();
   }
 }
 
@@ -357,23 +356,23 @@ export function startDownload(
   allowInstall?: boolean,
   handleErrors: boolean = true,
   referenceTag?: string,
-): BluebirdPromise<string> {
+): Promise<string> {
   let url: NXMUrl;
 
   log("debug", "start download", { fileName, referenceTag });
   try {
     url = new NXMUrl(nxmurl);
   } catch (err) {
-    return BluebirdPromise.reject(err);
+    return Promise.reject(err);
   }
 
   if (["vortex", "site"].includes(url.gameId) && url.view) {
     api.events.emit("show-extension-page", url.modId);
-    return BluebirdPromise.reject(new DownloadIsHTML(nxmurl));
+    return Promise.reject(new DownloadIsHTML(nxmurl));
   }
 
   if (!["mod", "collection"].includes(url.type)) {
-    return BluebirdPromise.reject(new ProcessCanceled("Not a download url"));
+    return Promise.reject(new ProcessCanceled("Not a download url"));
   }
 
   return url.type === "mod"
@@ -398,7 +397,7 @@ function startDownloadCollection(
   url: NXMUrl,
   handleErrors: boolean = true,
   referenceTag?: string,
-): BluebirdPromise<string> {
+): Promise<string> {
   const state: IState = api.getState();
   const games = knownGames(state);
   const gameId = convertNXMIdReverse(games, url.gameId);
@@ -407,7 +406,7 @@ function startDownloadCollection(
 
   const revNumber = url.revisionNumber >= 0 ? url.revisionNumber : undefined;
 
-  return BluebirdPromise.resolve(
+  return Promise.resolve(
     nexus.getCollectionRevisionGraph(FULL_REVISION_INFO, url.collectionSlug, revNumber),
   )
     .then((revision) => {
@@ -446,14 +445,17 @@ function startDownloadCollection(
           undefined,
           { allowInstall: false },
         ),
-      ).catch((err) => BluebirdPromise.reject(contextify(err)));
+      ).catch((err: Error) => Promise.reject(contextify(err)));
     })
-    .tap((dlId) => api.events.emit("did-download-collection", dlId))
-    .catch((err) => {
+    .then((dlId) => {
+      api.events.emit("did-download-collection", dlId);
+      return dlId;
+    })
+    .catch((err: any) => {
       err["collectionSlug"] = url.collectionSlug;
       err["revisionNumber"] = revisionInfo?.revisionNumber ?? url.revisionNumber;
       if (!handleErrors) {
-        return BluebirdPromise.reject(err);
+        return Promise.reject(err);
       }
       if (err.code === "NOT_FOUND") {
         api.showErrorNotification(
@@ -482,8 +484,8 @@ export function getInfo(
   domain: string,
   modId: number,
   fileId: number,
-): BluebirdPromise<IRemoteInfo> {
-  return BluebirdPromise.resolve(
+): Promise<IRemoteInfo> {
+  return Promise.resolve(
     (async () => {
       try {
         // Run both API calls concurrently for better performance
@@ -511,13 +513,13 @@ export function getInfoGraphQL(
   domain: string,
   modId: number,
   fileId: number,
-): BluebirdPromise<IRemoteInfo> {
+): Promise<IRemoteInfo> {
   const cacheKey = `${domain}_${modId}_${fileId}`;
 
   // Check cache first
   const cached = modInfoCache[cacheKey];
   if (cached && Date.now() < cached.expires) {
-    return BluebirdPromise.resolve(cached.data);
+    return Promise.resolve(cached.data);
   }
 
   // Define the GraphQL query for file information
@@ -558,7 +560,7 @@ export function getInfoGraphQL(
   // as makeFileUID needs the games list to convert domain names to numeric IDs
   return nexusGamesProm().then(
     () =>
-      new BluebirdPromise((resolve, reject) => {
+      new Promise((resolve, reject) => {
         const uid = makeFileUID({
           fileId: fileId.toString(),
           modId: modId.toString(),
@@ -675,7 +677,7 @@ export function getCollectionInfo(
   collectionSlug: string,
   revisionNumber: number,
   revisionId: number,
-): BluebirdPromise<IRemoteInfo> {
+): Promise<IRemoteInfo> {
   const query: IRevisionQuery = {
     adultContent: true,
     id: true,
@@ -719,15 +721,13 @@ export function getCollectionInfo(
     revisionNumber = undefined;
   }
 
-  return BluebirdPromise.resolve(
-    nexus.getCollectionRevisionGraph(query, collectionSlug, revisionNumber),
-  )
+  return Promise.resolve(nexus.getCollectionRevisionGraph(query, collectionSlug, revisionNumber))
     .then((revision) => ({ revisionInfo: revision }))
     .catch((err) => {
       err["collectionSlug"] = collectionSlug;
       err["revisionNumber"] = revisionNumber;
       err["revisionId"] = revisionId;
-      return BluebirdPromise.reject(err);
+      return Promise.reject(err);
     });
 }
 
@@ -741,7 +741,7 @@ function startDownloadMod(
   allowInstall?: boolean,
   handleErrors: boolean = true,
   referenceTag?: string,
-): BluebirdPromise<string> {
+): Promise<string> {
   log("info", "start download mod", { urlStr, allowInstall });
   let state = api.getState();
   const games = knownGames(state);
@@ -752,7 +752,7 @@ function startDownloadMod(
   return getInfoGraphQL(nexus, pageId, url.modId, url.fileId)
     .then(({ modInfo, fileInfo }) => {
       nexusFileInfo = fileInfo;
-      return new BluebirdPromise<string>((resolve, reject) => {
+      return new Promise<string>((resolve, reject) => {
         api.events.emit(
           "start-download",
           [urlStr],
@@ -774,7 +774,7 @@ function startDownloadMod(
         );
       });
     })
-    .tap(() => {
+    .then((downloadId) => {
       api.sendNotification({
         id: url.fileId.toString(),
         type: "global",
@@ -783,6 +783,7 @@ function startDownloadMod(
         displayMS: 4000,
         noToast: true,
       });
+      return downloadId;
     })
     .then((downloadId) => {
       if (gameId === SITE_ID) {
@@ -825,9 +826,9 @@ function startDownloadMod(
       }
       return downloadId;
     })
-    .catch((err) => {
+    .catch((err: any) => {
       if (!handleErrors) {
-        return BluebirdPromise.reject(err);
+        return Promise.reject(err);
       }
       const t = api.translate;
       // Handle "UNKNOWN" error code with errno 22 (EINVAL) as a non-fatal, warning.
@@ -1206,8 +1207,8 @@ export function endorseDirectImpl(
   nexusId: number,
   version: string,
   endorsedStatus: string,
-): BluebirdPromise<string> {
-  return endorseMod(nexus, gameId, nexusId, version, endorsedStatus).catch((err) => {
+): Promise<string> {
+  return endorseMod(nexus, gameId, nexusId, version, endorsedStatus).catch((err: any) => {
     reportEndorseError(api, err, "mod", gameId, nexusId, version);
     return endorsedStatus as EndorsedStatus;
   });
@@ -1367,7 +1368,7 @@ function nexusLink(state: IState, mod: IMod, gameMode: string) {
 }
 
 export function refreshEndorsements(store: Redux.Store<any>, nexus: Nexus) {
-  return BluebirdPromise.resolve(nexus.getEndorsements()).then((endorsements) => {
+  return Promise.resolve(nexus.getEndorsements()).then((endorsements) => {
     const endorseMap: {
       [gameId: string]: { [modId: string]: EndorsedStatus };
     } = endorsements.reduce((prev, endorsement: IEndorsement) => {
@@ -1421,7 +1422,7 @@ function filterByUpdateList(
   nexus: Nexus,
   gameId: string,
   input: IMod[],
-): BluebirdPromise<IMod[]> {
+): Promise<IMod[]> {
   const getGameId = (mod: IMod) => getSafe(mod.attributes, ["downloadGame"], undefined) || gameId;
 
   // all game ids for which we have mods installed
@@ -1447,7 +1448,7 @@ function filterByUpdateList(
     return prev;
   }, {});
 
-  return BluebirdPromise.reduce(
+  return reduce(
     gameIds,
     (prev: IUpdateMap, iterGameId: string) =>
       // minAge map may be missing certain gameIds when none of the installed mods
@@ -1495,12 +1496,12 @@ export function checkForCollectionUpdates(
   nexus: Nexus,
   gameId: string,
   mods: { [modId: string]: IMod },
-): BluebirdPromise<{ errorMessages: string[]; updatedIds: string[] }> {
+): Promise<{ errorMessages: string[]; updatedIds: string[] }> {
   const collectionIds = Object.keys(mods).filter(
     (modId) => mods[modId].attributes?.collectionId !== undefined,
   );
 
-  return BluebirdPromise.all(
+  return Promise.all(
     collectionIds.map((modId) => {
       const query: Partial<ICollectionQuery> = {
         viewerIsBlocked: true,
@@ -1575,7 +1576,7 @@ function checkForModUpdatesImpl(
   filteredMods: IMod[],
   forceFull: boolean | "silent",
   now: number,
-): BluebirdPromise<{ errorMessages: string[]; updatedIds: string[] }> {
+): Promise<{ errorMessages: string[]; updatedIds: string[] }> {
   const filtered = new Set(filteredMods.map((mod) => mod.id));
   const tStore = store as ThunkStore<any>;
   let pos = 0;
@@ -1610,7 +1611,7 @@ function checkForModUpdatesImpl(
   const newWerP = ["attributes", "newestVersion"];
   const newFileIdP = ["attributes", "newestFileId"];
 
-  return BluebirdPromise.map(
+  return map(
     modsList,
     (mod: IMod) => {
       if (!forceFull && !filtered.has(mod.id)) {
@@ -1664,18 +1665,20 @@ function checkForModUpdatesImpl(
             store.dispatch(setModAttribute(gameId, mod.id, "lastUpdateTime", now));
           }
         })
-        .catch(TimeoutError, (err) => {
-          const name = modName(mod, { version: true });
-          return BluebirdPromise.resolve(`${name}:\nRequest timeout`);
-        })
-        .catch((err) => {
+        .catch(
+          only(TimeoutError, (err) => {
+            const name = modName(mod, { version: true });
+            return Promise.resolve(`${name}:\nRequest timeout`);
+          }),
+        )
+        .catch((err: any) => {
           const detail = processErrorMessage(err);
           if (detail.fatal) {
-            return BluebirdPromise.reject(detail);
+            return Promise.reject(detail);
           }
 
           if (detail.message === undefined) {
-            return BluebirdPromise.resolve(undefined);
+            return Promise.resolve(undefined);
           }
 
           const name = modName(mod, { version: true });
@@ -1728,7 +1731,7 @@ export function checkModVersionsImpl(
   gameId: string,
   mods: { [modId: string]: IMod },
   forceFull: boolean | "silent",
-): BluebirdPromise<{ errors: string[]; modIds: string[] }> {
+): Promise<{ errors: string[]; modIds: string[] }> {
   const now = Date.now();
 
   const modsList: IMod[] = Object.keys(mods)
@@ -1745,7 +1748,7 @@ export function checkModVersionsImpl(
 
   return refreshEndorsements(store, nexus)
     .then(() =>
-      BluebirdPromise.all([
+      Promise.all([
         checkForCollectionUpdates(store, nexus, gameId, mods),
         checkForModUpdates(store, nexus, gameId, modsList, forceFull, now),
       ]),
@@ -1828,7 +1831,7 @@ function getUserInfo(
   api: IExtensionApi,
   nexus: Nexus,
   /*userInfo: IValidateKeyResponse*/
-): BluebirdPromise<boolean> {
+): Promise<boolean> {
   log("info", "updateUserInfo()");
 
   /**
@@ -1841,7 +1844,7 @@ function getUserInfo(
 
   if (isLoggedIn(api.getState())) {
     // get userinfo from api
-    return BluebirdPromise.resolve(nexus.getUserInfo())
+    return Promise.resolve(nexus.getUserInfo())
       .then((apiUserInfo) => {
         // update state with new info from endpoint
         api.store.dispatch(setUserInfo(transformUserInfoFromApi(apiUserInfo)));
@@ -1902,17 +1905,13 @@ function onJWTTokenRefresh(api: IExtensionApi, credentials: IOAuthCredentials, n
   //Promise.resolve(getUserInfo(api, nexus));
 }
 
-export function updateToken(
-  api: IExtensionApi,
-  nexus: Nexus,
-  credentials: any,
-): BluebirdPromise<boolean> {
+export function updateToken(api: IExtensionApi, nexus: Nexus, credentials: any): Promise<boolean> {
   log("info", "updateToken()");
 
   // update the nexus-node object with our credentials.
   // could be from nexus_integration once() or from when the credentials are updated in state
 
-  return BluebirdPromise.resolve(
+  return Promise.resolve(
     nexus.setOAuthCredentials(
       {
         fingerprint: credentials.fingerprint,
@@ -1937,73 +1936,79 @@ export function updateToken(
     });
 }
 
-export function updateKey(api: IExtensionApi, nexus: Nexus, key: string): BluebirdPromise<boolean> {
+export function updateKey(api: IExtensionApi, nexus: Nexus, key: string): Promise<boolean> {
   return (
-    BluebirdPromise.resolve(nexus.setKey(key))
+    Promise.resolve(nexus.setKey(key))
       .then(() => true)
       //.then(userInfo => updateUserInfo(api, nexus))
       // don't stop the login just because the github rate limit is exceeded
-      .catch(RateLimitExceeded, () => BluebirdPromise.resolve(true))
-      .catch(TimeoutError, (err) => {
-        api.sendNotification({
-          type: "error",
-          message: "API Key validation timed out",
-          actions: [
-            {
-              title: "Retry",
-              action: (dismiss) => {
-                updateKey(api, nexus, key);
-                dismiss();
+      .catch(only(RateLimitExceeded, () => Promise.resolve(true)))
+      .catch(
+        only(TimeoutError, (err) => {
+          api.sendNotification({
+            type: "error",
+            message: "API Key validation timed out",
+            actions: [
+              {
+                title: "Retry",
+                action: (dismiss) => {
+                  updateKey(api, nexus, key);
+                  dismiss();
+                },
               },
-            },
-          ],
-        });
-        api.store.dispatch(setUserInfo(undefined));
-        api.events.emit("did-login", err);
-        return false;
-      })
-      .catch(NexusError, (err) => {
-        api.sendNotification({
-          id: "nexus-login-failed",
-          type: "error",
-          title: "Failed to log in",
-          message: errorFromNexusError(err),
-          actions: [
-            {
-              title: "Try again",
-              action: (dismiss) => {
-                updateKey(api, nexus, key);
-                dismiss();
+            ],
+          });
+          api.store.dispatch(setUserInfo(undefined));
+          api.events.emit("did-login", err);
+          return false;
+        }),
+      )
+      .catch(
+        only(NexusError, (err) => {
+          api.sendNotification({
+            id: "nexus-login-failed",
+            type: "error",
+            title: "Failed to log in",
+            message: errorFromNexusError(err),
+            actions: [
+              {
+                title: "Try again",
+                action: (dismiss) => {
+                  updateKey(api, nexus, key);
+                  dismiss();
+                },
               },
-            },
-          ],
-        });
-        api.store.dispatch(setUserInfo(undefined));
-        api.events.emit("did-login", err);
-        return false;
-      })
-      .catch(ProcessCanceled, (err) => {
-        log("debug", "login canceled", err.message);
-        api.sendNotification({
-          id: "nexus-login-failed",
-          type: "error",
-          title: "Failed to log in",
-          message: err.message,
-          actions: [
-            {
-              title: "Try again",
-              action: (dismiss) => {
-                updateKey(api, nexus, key);
-                dismiss();
+            ],
+          });
+          api.store.dispatch(setUserInfo(undefined));
+          api.events.emit("did-login", err);
+          return false;
+        }),
+      )
+      .catch(
+        only(ProcessCanceled, (err) => {
+          log("debug", "login canceled", err.message);
+          api.sendNotification({
+            id: "nexus-login-failed",
+            type: "error",
+            title: "Failed to log in",
+            message: err.message,
+            actions: [
+              {
+                title: "Try again",
+                action: (dismiss) => {
+                  updateKey(api, nexus, key);
+                  dismiss();
+                },
               },
-            },
-          ],
-        });
-        api.store.dispatch(setUserInfo(undefined));
-        api.events.emit("did-login", err);
-        return false;
-      })
-      .catch((err) => {
+            ],
+          });
+          api.store.dispatch(setUserInfo(undefined));
+          api.events.emit("did-login", err);
+          return false;
+        }),
+      )
+      .catch((err: any) => {
         const t = api.translate;
         api.showErrorNotification(
           err.code === "ESOCKETTIMEDOUT"
@@ -2032,7 +2037,7 @@ export function updateKey(api: IExtensionApi, nexus: Nexus, key: string): Bluebi
 let nexusGamesCache: IGameListEntry[] = [];
 
 let onCacheLoaded: () => void;
-const cachePromise = new BluebirdPromise((resolve) => (onCacheLoaded = resolve));
+const cachePromise = new Promise<void>((resolve) => (onCacheLoaded = resolve));
 
 function cachePath() {
   return path.join(getVortexPath("temp"), "nexus_gamelist.json");
@@ -2047,12 +2052,12 @@ export function retrieveNexusGames(nexus: Nexus) {
     .catch(() => {
       // ignore missing cache
     })
-    .then(() => BluebirdPromise.resolve(jsonRequest<IGameListEntry[]>(GAMES_JSON_URL)))
+    .then(() => Promise.resolve(jsonRequest<IGameListEntry[]>(GAMES_JSON_URL)))
     .then((gamesList) => {
       nexusGamesCache = gamesList.sort((lhs, rhs) => lhs.name.localeCompare(rhs.name));
       return fs.writeFileAsync(cachePath(), JSON.stringify(gamesList));
     })
-    .catch((err) => {
+    .catch((err: any) => {
       // maybe network issues, may not be problematic
       log("warn", "failed to fetch list of nexus games", {
         error: err.message,
@@ -2076,7 +2081,7 @@ export function nexusGames(): IGameListEntry[] {
   return nexusGamesCache;
 }
 
-export function nexusGamesProm(): BluebirdPromise<IGameListEntry[]> {
+export function nexusGamesProm(): Promise<IGameListEntry[]> {
   return cachePromise.then(() => nexusGamesCache);
 }
 

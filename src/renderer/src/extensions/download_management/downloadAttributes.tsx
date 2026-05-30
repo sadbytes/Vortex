@@ -1,7 +1,6 @@
 import * as path from "path";
 import * as url from "url";
 
-import PromiseBB from "bluebird";
 import type { TFunction } from "i18next";
 import * as React from "react";
 
@@ -138,7 +137,7 @@ function createColumns(
   };
 
   const onSetDownloadGames = (dlId: string, games: string[]) => {
-    return PromiseBB.resolve(setDownloadGames(api, dlId, games, withAddInProgress));
+    return Promise.resolve(setDownloadGames(api, dlId, games, withAddInProgress));
   };
 
   return [
@@ -263,7 +262,7 @@ function createColumns(
           .then((stat) => {
             const id = Object.keys(downloads).find((key) => downloads[key] === attributes);
             onSetAttribute(id, stat.mtimeMs);
-            return PromiseBB.resolve(stat.mtime);
+            return Promise.resolve(stat.mtime);
           })
           .catch(() => undefined);
       },

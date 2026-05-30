@@ -15,10 +15,8 @@
     "extensionName": "Game Store: Xbox"
   },
   "devDependencies": {
-    "@types/bluebird": "catalog:",
     "@types/node": "catalog:",
     "@types/redux": "catalog:",
-    "bluebird": "catalog:",
     "copyfiles": "catalog:",
     "redux": "catalog:",
     "redux-thunk": "catalog:",

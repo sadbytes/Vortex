@@ -1,7 +1,6 @@
 import * as path from "path";
 
 import type { EndorsedStatus } from "@nexusmods/nexus-api";
-import PromiseBB from "bluebird";
 import * as _ from "lodash";
 import * as React from "react";
 import { Alert, Button, Panel } from "react-bootstrap";
@@ -21,6 +20,7 @@ import ToolbarIcon from "../../controls/ToolbarIcon";
 import type { IExtension, IExtensionWithState } from "../../types/extensions";
 import type { IExtensionLoadFailure, IExtensionState, IState } from "../../types/IState";
 import type { ITableAttribute } from "../../types/ITableAttribute";
+import { map } from "../../util/asyncpromise";
 import { relaunch } from "../../util/commandLine";
 import { log } from "../../util/log";
 import * as selectors from "../../util/selectors";
@@ -215,9 +215,9 @@ class ExtensionManager extends ComponentEx<IProps, IComponentState> {
     const { downloads } = this.props;
     let success = false;
     log("info", "installing extension(s) via drag and drop", { extPaths });
-    const prop: PromiseBB<void[]> =
+    const prop: Promise<void[]> =
       type === "files"
-        ? PromiseBB.map(extPaths, (extPath) =>
+        ? map(extPaths, (extPath) =>
             installExtension(this.context.api, extPath)
               .then(() => {
                 success = true;
@@ -228,10 +228,10 @@ class ExtensionManager extends ComponentEx<IProps, IComponentState> {
                 });
               }),
           )
-        : PromiseBB.map(
+        : map(
             extPaths,
             (url) =>
-              new PromiseBB<void>((resolve, reject) => {
+              new Promise<void>((resolve, reject) => {
                 this.context.api.events.emit(
                   "start-download",
                   [url],

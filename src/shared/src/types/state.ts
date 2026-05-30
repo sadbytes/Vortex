@@ -7,7 +7,7 @@ import type { Serializable } from "./ipc";
  * and cannot be moved to shared because of external dependencies:
  * - IMod imports from 'modmeta-db' (external npm package)
  * - IDownload imports from runtime code (DownloadManager.ts)
- * - Deep transitive dependencies on Bluebird, ITool chain, etc.
+ * - Deep transitive dependencies on extension runtime types, ITool chain, etc.
  *
  * This minimal version provides type-safe hive names without those dependencies.
  * The renderer can cast the Serializable data to IState[hive] where full typing is needed.

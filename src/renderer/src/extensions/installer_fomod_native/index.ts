@@ -1,5 +1,3 @@
-import { method as toBluebird } from "bluebird";
-
 import type { IExtensionContext } from "../../types/IExtensionContext";
 import type { IInstallationDetails } from "../mod_management/types/InstallFunc";
 import type { ITestSupportedDetails } from "../mod_management/types/TestSupported";
@@ -15,75 +13,67 @@ const main = (context: IExtensionContext): boolean => {
   context.registerInstaller(
     /*id:*/ `fomod`,
     /*priority:*/ 10,
-    /*testSupported:*/ toBluebird(
-      async (
-        files: string[],
-        _gameId: string,
-        _archivePath: string,
-        details?: ITestSupportedDetails,
-      ) => {
-        return await testSupported(files, details, false);
-      },
-    ),
-    /*install:*/ toBluebird(
-      async (
-        files: string[],
-        destinationPath: string,
-        gameId: string,
-        _progressDelegate: unknown,
-        choices?: unknown,
-        unattended?: boolean,
-        _archivePath?: string,
-        details?: IInstallationDetails,
-      ) => {
-        return await install(
-          context.api,
-          files,
-          destinationPath,
-          gameId,
-          choices,
-          unattended,
-          details,
-        );
-      },
-    ),
+    /*testSupported:*/ async (
+      files: string[],
+      _gameId: string,
+      _archivePath: string,
+      details?: ITestSupportedDetails,
+    ) => {
+      return await testSupported(files, details, false);
+    },
+    /*install:*/ async (
+      files: string[],
+      destinationPath: string,
+      gameId: string,
+      _progressDelegate: unknown,
+      choices?: unknown,
+      unattended?: boolean,
+      _archivePath?: string,
+      details?: IInstallationDetails,
+    ) => {
+      return await install(
+        context.api,
+        files,
+        destinationPath,
+        gameId,
+        choices,
+        unattended,
+        details,
+      );
+    },
   );
 
   context.registerInstaller(
     /*id:*/ `fomod`,
     /*priority:*/ 100,
-    /*testSupported:*/ toBluebird(
-      async (
-        files: string[],
-        _gameId: string,
-        _archivePath: string,
-        details?: ITestSupportedDetails,
-      ) => {
-        return await testSupported(files, details, true);
-      },
-    ),
-    /*install:*/ toBluebird(
-      async (
-        files: string[],
-        destinationPath: string,
-        gameId: string,
-        _progressDelegate: unknown,
-        choices?: unknown,
-        unattended?: boolean,
-        _archivePath?: string,
-        details?: IInstallationDetails,
-      ) => {
-        return await install(
-          context.api,
-          files,
-          destinationPath,
-          gameId,
-          choices,
-          unattended,
-          details,
-        );
-      },
-    ),
+    /*testSupported:*/ async (
+      files: string[],
+      _gameId: string,
+      _archivePath: string,
+      details?: ITestSupportedDetails,
+    ) => {
+      return await testSupported(files, details, true);
+    },
+    /*install:*/ async (
+      files: string[],
+      destinationPath: string,
+      gameId: string,
+      _progressDelegate: unknown,
+      choices?: unknown,
+      unattended?: boolean,
+      _archivePath?: string,
+      details?: IInstallationDetails,
+    ) => {
+      return await install(
+        context.api,
+        files,
+        destinationPath,
+        gameId,
+        choices,
+        unattended,
+        details,
+      );
+    },
   );
 
   context.once(() => {

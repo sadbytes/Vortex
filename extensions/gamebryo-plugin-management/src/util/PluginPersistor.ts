@@ -1,7 +1,6 @@
 import * as path from "path";
 
 import { fs, log, types, util } from "@nexusmods/vortex-api";
-import Promise from "bluebird";
 
 import { ILoadOrder } from "../types/ILoadOrder";
 import {
@@ -338,12 +337,14 @@ class PluginPersistor implements types.IPersistor {
         if (this.mPluginFormat === "original" && this.mControlOrder()) {
           const offset = 946684800;
           const oneDay = 24 * 60 * 60;
-          return Promise.mapSeries(sorted, (fileName, idx) => {
-            const mtime = offset + oneDay * idx;
-            return fs
-              .utimesAsync(path.join(this.mDataPath, fileName), mtime, mtime)
-              .catch((err) => (err.code === "ENOENT" ? Promise.resolve() : Promise.reject(err)));
-          }).then(() => undefined);
+          return util
+            .mapSeries(sorted, (fileName, idx) => {
+              const mtime = offset + oneDay * idx;
+              return fs
+                .utimesAsync(path.join(this.mDataPath, fileName), mtime, mtime)
+                .catch((err) => (err.code === "ENOENT" ? Promise.resolve() : Promise.reject(err)));
+            })
+            .then(() => undefined);
         } else {
           return Promise.resolve();
         }
@@ -356,7 +357,7 @@ class PluginPersistor implements types.IPersistor {
         this.mLastWriteTime = stats.mtime;
         return null;
       })
-      .catch(util.UserCanceled, () => null)
+      .catch(util.only(util.UserCanceled, () => null))
       .catch((err) => {
         if (err.code !== "EBUSY") {
           // Disallow error reports for:
@@ -486,9 +487,14 @@ class PluginPersistor implements types.IPersistor {
 
         return fs
           .readdirAsync(this.mDataPath)
-          .filter((fileName: string) => newPlugins[toPluginId(fileName)] !== undefined)
+          .then((__arr) =>
+            util.filter(
+              __arr,
+              (fileName: string) => newPlugins[toPluginId(fileName)] !== undefined,
+            ),
+          )
           .then((fileNames: string[]) =>
-            Promise.map(fileNames, (fileName) =>
+            util.map(fileNames, (fileName) =>
               fs
                 .statAsync(path.join(this.mDataPath, fileName))
                 .then((stat) => ({ fileName, fileTime: stat.mtimeMs })),
@@ -511,12 +517,14 @@ class PluginPersistor implements types.IPersistor {
         this.mFailed = false;
         return Promise.resolve();
       })
-      .catch(util.UserCanceled, (err) => {
-        this.mLoaded = true;
-        this.reportError("reading plugin list canceled", err, {
-          allowReport: false,
-        });
-      })
+      .catch(
+        util.only(util.UserCanceled, (err) => {
+          this.mLoaded = true;
+          this.reportError("reading plugin list canceled", err, {
+            allowReport: false,
+          });
+        }),
+      )
       .catch((err: any) => {
         if (err.code === "ENOENT") {
           this.mLoaded = true;
@@ -573,7 +581,7 @@ class PluginPersistor implements types.IPersistor {
                 this.scheduleRefresh(500);
               }
             })
-            .catch(util.UserCanceled, () => Promise.resolve())
+            .catch(util.only(util.UserCanceled, () => Promise.resolve()))
             .catch((err) =>
               err.code === "ENOENT"
                 ? Promise.resolve()

@@ -1,6 +1,5 @@
 /* eslint-disable */
 const Big = require("big.js");
-const Promise = require("bluebird");
 const { parseStringPromise } = require("xml2js");
 const path = require("path");
 const { fs, log, selectors, util } = require("@nexusmods/vortex-api");
@@ -64,7 +63,7 @@ async function parseIndexFiles(indexPath) {
     .readdirAsync(indexPath)
     .then((files) => {
       const xmlFiles = files.filter((file) => path.extname(file) === ".xml");
-      return Promise.reduce(
+      return util.reduce(
         xmlFiles,
         (modName, file) => {
           return fs
@@ -281,26 +280,29 @@ function migrate101(api, oldVersion) {
     });
 
   const gameInstallationPath = selectors.installPathForGame(state, GAME_ID);
-  return Promise.reduce(
-    modIds,
-    (accum, modId) => {
-      const mod = mods[modId];
-      const modStagingPath = path.join(gameInstallationPath, mod.installationPath);
-      return fs
-        .readdirAsync(modStagingPath)
-        .then((entries) => {
-          const hasInvalidModName = entries.find((entry) => entry.startsWith("ws_")) !== undefined;
-          if (hasInvalidModName) {
-            accum.push(modId);
-          }
-          return Promise.resolve(accum);
-        })
-        .catch((err) => Promise.resolve(accum));
-    },
-    [],
-  ).then((invalidMods) =>
-    invalidMods.length > 0 ? reinstallNotif(invalidMods) : Promise.resolve(),
-  );
+  return util
+    .reduce(
+      modIds,
+      (accum, modId) => {
+        const mod = mods[modId];
+        const modStagingPath = path.join(gameInstallationPath, mod.installationPath);
+        return fs
+          .readdirAsync(modStagingPath)
+          .then((entries) => {
+            const hasInvalidModName =
+              entries.find((entry) => entry.startsWith("ws_")) !== undefined;
+            if (hasInvalidModName) {
+              accum.push(modId);
+            }
+            return Promise.resolve(accum);
+          })
+          .catch((err) => Promise.resolve(accum));
+      },
+      [],
+    )
+    .then((invalidMods) =>
+      invalidMods.length > 0 ? reinstallNotif(invalidMods) : Promise.resolve(),
+    );
 }
 
 async function prepareForModding(discovery) {

@@ -17,7 +17,6 @@
   "devDependencies": {
     "@types/i18next": "catalog:",
     "@types/rimraf": "catalog:",
-    "bluebird": "catalog:",
     "copyfiles": "catalog:",
     "lz4js": "^0.2.0",
     "rimraf": "catalog:",

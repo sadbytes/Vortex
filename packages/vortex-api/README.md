@@ -20,7 +20,7 @@ For notable open-source extensions with advanced patterns, see the [Example Exte
 npm install vortex-api
 ```
 
-`vortex-api` declares Vortex runtime packages (React, Redux, Bluebird, etc.) as `peerDependencies`. With pnpm, npm 7+, or Yarn Berry these are installed automatically - you don't need to add them to your own `devDependencies`. For details on migrating from earlier versions, see the [Migration Guide](docs/MIGRATION.md).
+`vortex-api` declares Vortex runtime packages (React, Redux, etc.) as `peerDependencies`. With pnpm, npm 7+, or Yarn Berry these are installed automatically - you don't need to add them to your own `devDependencies`. For details on migrating from earlier versions, see the [Migration Guide](docs/MIGRATION.md).
 
 ## Extension structure
 

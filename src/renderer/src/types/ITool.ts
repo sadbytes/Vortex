@@ -1,5 +1,3 @@
-import type PromiseBB from "bluebird";
-
 import type { IGameStoreEntry } from "./IGameStoreEntry";
 
 /**
@@ -61,7 +59,7 @@ export interface ITool {
    * This may be left undefined but then the location for the tool/game can only be set
    * manually
    */
-  queryPath?: () => string | PromiseBB<string | IGameStoreEntry>;
+  queryPath?: () => string | Promise<string | IGameStoreEntry>;
 
   /**
    * return the path of the tool executable relative to the tool base path,

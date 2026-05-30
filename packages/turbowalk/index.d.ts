@@ -1,5 +1,3 @@
-import type Bluebird from "bluebird";
-
 export interface IEntry {
   // full path to the file (native separators)
   filePath: string;
@@ -42,6 +40,6 @@ declare function turbowalk(
   basePath: string,
   progress: (entries: IEntry[]) => void,
   options?: IWalkOptions,
-): Bluebird<void>;
+): Promise<void>;
 
 export default turbowalk;

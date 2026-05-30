@@ -1,7 +1,6 @@
 import * as path from "path";
 
 import { actions, OptionsFilter, selectors, types, util } from "@nexusmods/vortex-api";
-import Bluebird from "bluebird";
 import * as React from "react";
 import * as Redux from "redux";
 import turbowalk from "turbowalk";
@@ -64,7 +63,7 @@ function main(context: types.IExtensionContext) {
     () => {
       util["batchDispatch"](context.api.store, contentUpdates);
       contentUpdates = [];
-      return Bluebird.resolve();
+      return Promise.resolve();
     },
     500,
     true,

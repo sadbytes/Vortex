@@ -14,7 +14,6 @@
     "extensionName": "Capcom MT Framework arc Support"
   },
   "devDependencies": {
-    "@types/bluebird": "catalog:",
     "@types/i18next": "catalog:",
     "@types/react": "catalog:",
     "@types/redux": "catalog:",

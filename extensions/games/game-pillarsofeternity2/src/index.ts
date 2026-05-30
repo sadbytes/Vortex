@@ -1,7 +1,6 @@
 import * as path from "path";
 
 import { fs, log, selectors, types, util } from "@nexusmods/vortex-api";
-import Promise from "bluebird";
 
 import { getLoadOrder, setLoadOrder, startWatch, stopWatch } from "./sync";
 import { ILoadOrder } from "./types";
@@ -166,17 +165,19 @@ function init(context: types.IExtensionContext) {
     context.api.events.on("gamemode-activated", (gameMode: string) => {
       if (gameMode === "pillarsofeternity2") {
         startWatch(context.api.store.getState())
-          .catch(util.DataInvalid, (err) => {
-            const errorMessage =
-              "Your mod configuration file is invalid, you must remove/fix " +
-              "this file for the mods to function correctly. The file is " +
-              "located in: " +
-              // tslint:disable-next-line:max-line-length
-              '"C:\\Users\\{YOUR_USERNAME}\\AppData\\LocalLow\\Obsidian Entertainment\\Pillars of Eternity II\\modconfig.json"';
-            context.api.showErrorNotification("Invalid modconfig.json file", errorMessage, {
-              allowReport: false,
-            });
-          })
+          .catch(
+            util.only(util.DataInvalid, (err) => {
+              const errorMessage =
+                "Your mod configuration file is invalid, you must remove/fix " +
+                "this file for the mods to function correctly. The file is " +
+                "located in: " +
+                // tslint:disable-next-line:max-line-length
+                '"C:\\Users\\{YOUR_USERNAME}\\AppData\\LocalLow\\Obsidian Entertainment\\Pillars of Eternity II\\modconfig.json"';
+              context.api.showErrorNotification("Invalid modconfig.json file", errorMessage, {
+                allowReport: false,
+              });
+            }),
+          )
           .catch((err) => {
             context.api.showErrorNotification("Failed to update modorder", err);
           });

@@ -1,5 +1,4 @@
 import { getErrorMessageOrDefault, unknownToError } from "@vortex/shared";
-import type PromiseBB from "bluebird";
 import * as React from "react";
 import { Media } from "react-bootstrap";
 import { useTranslation } from "react-i18next";
@@ -36,7 +35,7 @@ import type { IReducerAction, StateReducerType } from "./types";
 import { propOf, updateJumpList } from "./util";
 
 interface IBaseProps {
-  onGetValidTools: (starters: IStarterInfo[], gameMode: string) => PromiseBB<string[]>;
+  onGetValidTools: (starters: IStarterInfo[], gameMode: string) => Promise<string[]>;
 }
 
 interface IConnectedProps {
@@ -87,7 +86,7 @@ interface IActionProps {
     title: string,
     content: IDialogContent,
     actions: DialogActions,
-  ) => PromiseBB<IDialogResult>;
+  ) => Promise<IDialogResult>;
   onSetPrimary: (gameId: string, toolId: string) => void;
   onSetToolOrder: (gameId: string, tools: string[]) => void;
 }

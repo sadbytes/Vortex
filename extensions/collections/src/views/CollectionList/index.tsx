@@ -11,7 +11,6 @@ import {
   util,
 } from "@nexusmods/vortex-api";
 /* eslint-disable */
-import Bluebird from "bluebird";
 import type { TFunction } from "i18next";
 import * as React from "react";
 import { WithTranslation, withTranslation } from "react-i18next";
@@ -499,7 +498,7 @@ class CollectionsMainPage extends ComponentEx<ICollectionsMainPageProps, ICompon
 
     const eaa = (ruleList, recommended) => {
       if (ruleList.length === 0) {
-        return Bluebird.resolve();
+        return Promise.resolve();
       } else {
         return api.emitAndAwait("install-from-dependencies", collectionId, ruleList, recommended);
       }

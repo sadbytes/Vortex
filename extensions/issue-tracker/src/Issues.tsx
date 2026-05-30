@@ -10,7 +10,6 @@ import {
   util,
 } from "@nexusmods/vortex-api";
 import * as va from "@nexusmods/vortex-api";
-import Promise from "bluebird";
 import * as React from "react";
 import { Button, OverlayTrigger, Popover } from "react-bootstrap";
 import * as ReactDOM from "react-dom";
@@ -366,60 +365,62 @@ class IssueList extends ComponentEx<IProps, IIssueListState> {
         onUpdateIssueList(filteredRes.map((issue) => issue.issue_number.toString()));
         const now = Date.now();
         let outstanding: IOutstandingIssue[] = force ? [] : (this.props.outstandingIssues ?? []);
-        return Promise.mapSeries(filteredRes, (issue) => {
-          const issueId = issue.issue_number.toString();
-          const isIssueClosed = !force
-            ? !!issues?.[issueId]?.state
-              ? issues[issueId].state === "closed"
-              : false
-            : false;
+        return util
+          .mapSeries(filteredRes, (issue) => {
+            const issueId = issue.issue_number.toString();
+            const isIssueClosed = !force
+              ? !!issues?.[issueId]?.state
+                ? issues[issueId].state === "closed"
+                : false
+              : false;
 
-          if (isIssueClosed) {
-            return Promise.resolve();
-          }
+            if (isIssueClosed) {
+              return Promise.resolve();
+            }
 
-          if (
-            force ||
-            issues[issueId] === undefined ||
-            issues[issueId].cacheTime === undefined ||
-            now - issues[issueId].cacheTime > UPDATE_FREQUENCY
-          ) {
-            return this.requestIssue(issueId).then((issueDetails) => {
-              const replyRequired =
-                issueDetails.labels.find((lbl) => isFeedbackRequiredLabel(lbl.name)) !== undefined;
-              const isClosed = issueDetails.state === "closed";
-              const updateIssueDetails = (id: string, cached: IGithubIssueCache) => {
-                onSetUpdateDetails(id, cached);
-                return Promise.resolve();
-              };
+            if (
+              force ||
+              issues[issueId] === undefined ||
+              issues[issueId].cacheTime === undefined ||
+              now - issues[issueId].cacheTime > UPDATE_FREQUENCY
+            ) {
+              return this.requestIssue(issueId).then((issueDetails) => {
+                const replyRequired =
+                  issueDetails.labels.find((lbl) => isFeedbackRequiredLabel(lbl.name)) !==
+                  undefined;
+                const isClosed = issueDetails.state === "closed";
+                const updateIssueDetails = (id: string, cached: IGithubIssueCache) => {
+                  onSetUpdateDetails(id, cached);
+                  return Promise.resolve();
+                };
 
-              return isClosed
-                ? updateIssueDetails(issueId, cacheEntry(issueDetails, undefined))
-                : getLastDevComment(issueDetails, issues[issueId], username, force).then(
-                    (comment: IGithubCommentCache) => {
-                      const cachedEntry = cacheEntry(issueDetails, comment);
-                      if (comment !== undefined) {
-                        const lastResponseMS = cachedEntry.cachedComment.lastCommentResponseMS;
-                        const commentDate = new Date(comment.comment.updated_at);
-                        if (replyRequired && lastResponseMS < commentDate.getTime()) {
-                          // Only add this if we confirm that:
-                          //  1. The waiting for response label is set.
-                          //  2. The issue is still open.
-                          //  3. The latest comment's date is more recent than the date of the
-                          //     comment to which the user has responded last.
-                          outstanding.push({
-                            issue: issueDetails,
-                            lastDevComment: comment.comment,
-                          });
+                return isClosed
+                  ? updateIssueDetails(issueId, cacheEntry(issueDetails, undefined))
+                  : getLastDevComment(issueDetails, issues[issueId], username, force).then(
+                      (comment: IGithubCommentCache) => {
+                        const cachedEntry = cacheEntry(issueDetails, comment);
+                        if (comment !== undefined) {
+                          const lastResponseMS = cachedEntry.cachedComment.lastCommentResponseMS;
+                          const commentDate = new Date(comment.comment.updated_at);
+                          if (replyRequired && lastResponseMS < commentDate.getTime()) {
+                            // Only add this if we confirm that:
+                            //  1. The waiting for response label is set.
+                            //  2. The issue is still open.
+                            //  3. The latest comment's date is more recent than the date of the
+                            //     comment to which the user has responded last.
+                            outstanding.push({
+                              issue: issueDetails,
+                              lastDevComment: comment.comment,
+                            });
+                          }
                         }
-                      }
 
-                      return updateIssueDetails(issueId, cachedEntry);
-                    },
-                  );
-            });
-          }
-        })
+                        return updateIssueDetails(issueId, cachedEntry);
+                      },
+                    );
+              });
+            }
+          })
           .then(() => {
             //  Make sure we don't list duplicates.
             outstanding = outstanding.reduce(
@@ -439,16 +440,22 @@ class IssueList extends ComponentEx<IProps, IIssueListState> {
             }
             onSetOustandingIssues(outstanding);
           })
-          .tapCatch((err) => {
-            if (err.message.includes("Status Code: 403") && force) {
-              this.context.api.sendNotification({
-                message: t("Sent too many github API requests - try again later"),
-                type: "info",
-                displayMS: 3000,
-              });
-            }
-            log("warn", "Failed to retrieve github issues", err);
-          });
+          .catch((__e) =>
+            Promise.resolve(
+              ((err) => {
+                if (err.message.includes("Status Code: 403") && force) {
+                  this.context.api.sendNotification({
+                    message: t("Sent too many github API requests - try again later"),
+                    type: "info",
+                    displayMS: 3000,
+                  });
+                }
+                log("warn", "Failed to retrieve github issues", err);
+              })(__e),
+            ).then(() => {
+              throw __e;
+            }),
+          );
       })
       .catch((err) => {
         if (err instanceof util.ProcessCanceled) {

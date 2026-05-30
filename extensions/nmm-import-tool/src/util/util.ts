@@ -95,7 +95,7 @@ export async function testAccess(t: TFunction, source: string): Promise<void> {
 
   const dirElements: string[] = await fs
     .readdirAsync(source)
-    .filter((el) => archiveExtLookup.has(path.extname(el)));
+    .then((__arr) => util.filter(__arr, (el) => archiveExtLookup.has(path.extname(el))));
   if (dirElements.length === 0) {
     return Promise.resolve();
   }
@@ -161,7 +161,7 @@ export async function getArchives(
 
   return fs
     .readdirAsync(source)
-    .filter((filePath: string) => knownArchiveExt(filePath))
+    .then((__arr) => util.filter(__arr, (filePath: string) => knownArchiveExt(filePath)))
     .then((archives: string[]) => archives.filter((archive) => !modFileNames.has(archive)))
     .catch((err: Error) => {
       this.nextState.error = err.message;

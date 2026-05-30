@@ -1,10 +1,10 @@
 import * as path from "path";
 
 import { getErrorCode, getErrorMessageOrDefault } from "@vortex/shared";
-import PromiseBB from "bluebird";
 
 import type { IExtensionApi, IExtensionContext } from "../../types/IExtensionContext";
 import type { IGame } from "../../types/IGame";
+import { delay } from "../../util/asyncpromise";
 import { UserCanceled } from "../../util/CustomErrors";
 import * as fs from "../../util/fs";
 import getVortexPath from "../../util/getVortexPath";
@@ -135,10 +135,10 @@ class DeploymendMethod extends LinkingDeployment {
       // cleanup failed, this is almost certainly due to an AV jumping in to check these new files,
       // I mean, why would I be able to create the files but not delete them?
       // just try again later - can't do that synchronously though
-      PromiseBB.delay(100)
+      delay(100)
         .then(() => fs.removeAsync(canary + ".link"))
         .then(() => fs.removeAsync(canary))
-        .catch((err) => {
+        .catch((err: any) => {
           log(
             "error",
             "failed to clean up canary file. This indicates we were able to create " +
@@ -155,7 +155,7 @@ class DeploymendMethod extends LinkingDeployment {
     return this.ensureDir(path.dirname(linkPath), dirTags).then(() =>
       fs
         .symlinkAsync(sourcePath, linkPath)
-        .catch((err) =>
+        .catch((err: any) =>
           err.code !== "EEXIST"
             ? Promise.reject(err)
             : fs.removeAsync(linkPath).then(() => fs.symlinkAsync(sourcePath, linkPath)),
@@ -193,7 +193,7 @@ class DeploymendMethod extends LinkingDeployment {
             return fs.unlinkAsync(iterPath, { showDialogCallback });
           }
         })
-        .catch((err) => {
+        .catch((err: any) => {
           if (err instanceof UserCanceled) {
             canceled = true;
             return Promise.reject(err);
@@ -218,7 +218,7 @@ class DeploymendMethod extends LinkingDeployment {
     });
   }
 
-  protected isLink(linkPath: string, sourcePath: string): PromiseBB<boolean> {
+  protected isLink(linkPath: string, sourcePath: string): Promise<boolean> {
     return (
       fs
         .readlinkAsync(linkPath)

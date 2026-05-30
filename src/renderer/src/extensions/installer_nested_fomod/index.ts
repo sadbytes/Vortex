@@ -6,8 +6,6 @@
 
 import * as path from "path";
 
-import PromiseBB from "bluebird";
-
 import type {
   IExtensionApi,
   IExtensionContext,
@@ -16,8 +14,8 @@ import type {
 } from "../../types/IExtensionContext";
 import { log } from "../../util/log";
 
-function testSupported(files: string[]): PromiseBB<ISupportedResult> {
-  return new PromiseBB((resolve, reject) => {
+function testSupported(files: string[]): Promise<ISupportedResult> {
+  return new Promise((resolve, reject) => {
     const fomod = files.find((file) => path.extname(file) === ".fomod");
     if (fomod !== undefined) {
       resolve({ supported: true, requiredFiles: [fomod] });
@@ -35,8 +33,8 @@ function install(
   choicesIn: any,
   unattended: boolean,
   progress: ProgressDelegate,
-): PromiseBB<any> {
-  return new PromiseBB((resolve, reject) => {
+): Promise<any> {
+  return new Promise((resolve, reject) => {
     const fomod = files.find((file) => path.extname(file) === ".fomod");
     const filePath = path.join(destinationPath, fomod);
     log("debug", "install nested", filePath);

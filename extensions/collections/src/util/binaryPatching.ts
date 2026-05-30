@@ -1,7 +1,6 @@
 import * as path from "path";
 
 import { fs, log, selectors, types, util } from "@nexusmods/vortex-api";
-import Bluebird from "bluebird";
 import * as crc32 from "crc-32";
 
 import { MAX_PATCH_SIZE, PATCHES_PATH, PATCH_OVERHEAD } from "../constants";
@@ -28,7 +27,7 @@ export function scanForDiffs(
   modId: string,
   destPath: string,
   onProgress: (percent: number, text: string) => void,
-): Bluebird<{ [filePath: string]: string }> {
+): Promise<{ [filePath: string]: string }> {
   const state = api.getState();
   const mod = state.persistent.mods[gameId][modId];
 
@@ -45,7 +44,7 @@ export function scanForDiffs(
 
   return queue(
     () =>
-      new Bluebird((resolve, reject) => {
+      new Promise((resolve, reject) => {
         api.events.emit(
           "simulate-installer",
           gameId,
@@ -140,7 +139,7 @@ export function scanForDiffs(
         );
       }),
     false,
-  ) as Bluebird<{ [filePath: string]: string }>;
+  ) as Promise<{ [filePath: string]: string }>;
 }
 
 export async function applyPatches(

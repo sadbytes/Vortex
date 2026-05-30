@@ -20,7 +20,6 @@ import {
   Usage,
   util,
 } from "@nexusmods/vortex-api";
-import Promise from "bluebird";
 import I18next, { TFunction } from "i18next";
 import update from "immutability-helper";
 import * as _ from "lodash";
@@ -481,7 +480,7 @@ class PluginList extends ComponentEx<IProps, IComponentState> {
             onClick: () =>
               this.context.api.events.emit("autosort-plugins", true, () => {
                 this.updatePlugins(this.props.plugins, this.props.gameMode)
-                  .catch(util.ProcessCanceled, () => null)
+                  .catch(util.only(util.ProcessCanceled, () => null))
                   .catch((err) => {
                     log("warn", "failed to update plugins", {
                       error: err.message,
@@ -512,7 +511,7 @@ class PluginList extends ComponentEx<IProps, IComponentState> {
         return Promise.resolve();
       }
       return this.updatePlugins(pluginList, gameId)
-        .catch(util.ProcessCanceled, () => null)
+        .catch(util.only(util.ProcessCanceled, () => null))
         .catch((err) => {
           log("warn", "failed to update plugins", { error: err.message });
         });
@@ -574,7 +573,7 @@ class PluginList extends ComponentEx<IProps, IComponentState> {
       .then(() =>
         this.applyUserlist(this.props.userlist.plugins || [], this.props.masterlist.plugins || []),
       )
-      .catch(util.ProcessCanceled, () => null)
+      .catch(util.only(util.ProcessCanceled, () => null))
       .catch((err) => {
         log("warn", "failed to update plugins", { error: err.message });
       });
@@ -780,59 +779,60 @@ class PluginList extends ComponentEx<IProps, IComponentState> {
     const pluginsParsed: { [pluginName: string]: IPluginParsed } = {};
     let pluginsLoot;
 
-    return Promise.each(pluginNames, async (pluginName: string) => {
-      if (updateId !== this.mUpdateId) {
-        return Promise.reject(new util.ProcessCanceled("new update started"));
-      }
-      try {
-        const esp = await this.props.parseESPFile(
-          pluginsIn[pluginName].filePath,
-          this.props.gameMode,
-        );
-        pluginsParsed[pluginName] = {
-          isMaster: this.props.isMaster(
+    return util
+      .each(pluginNames, async (pluginName: string) => {
+        if (updateId !== this.mUpdateId) {
+          return Promise.reject(new util.ProcessCanceled("new update started"));
+        }
+        try {
+          const esp = await this.props.parseESPFile(
             pluginsIn[pluginName].filePath,
-            esp.isMaster,
             this.props.gameMode,
-          ),
-          isLight: this.props.isLight(
-            pluginsIn[pluginName].filePath,
-            esp.isLight,
-            this.props.gameMode,
-          ),
-          isMedium: await this.props.isMediumMaster(
-            pluginsIn[pluginName].filePath,
-            esp.isMedium,
-            this.props.gameMode,
-          ),
-          isBlueprint: esp.isBlueprint,
-          parseFailed: false,
-          description: esp.description,
-          author: esp.author,
-          masterList: esp.masterList,
-          revision: (esp as any).revision,
-        };
-      } catch (err) {
-        log("info", "failed to parse esp", {
-          path: pluginsIn[pluginName].filePath,
-          error: err.message,
-        });
-        pluginsParsed[pluginName] = {
-          isMaster: false,
-          isLight: false,
-          isMedium: false,
-          isBlueprint: false,
-          parseFailed: true,
-          description: "",
-          author: "",
-          masterList: [],
-          revision: 999,
-        };
-      }
-    })
+          );
+          pluginsParsed[pluginName] = {
+            isMaster: this.props.isMaster(
+              pluginsIn[pluginName].filePath,
+              esp.isMaster,
+              this.props.gameMode,
+            ),
+            isLight: this.props.isLight(
+              pluginsIn[pluginName].filePath,
+              esp.isLight,
+              this.props.gameMode,
+            ),
+            isMedium: await this.props.isMediumMaster(
+              pluginsIn[pluginName].filePath,
+              esp.isMedium,
+              this.props.gameMode,
+            ),
+            isBlueprint: esp.isBlueprint,
+            parseFailed: false,
+            description: esp.description,
+            author: esp.author,
+            masterList: esp.masterList,
+            revision: (esp as any).revision,
+          };
+        } catch (err) {
+          log("info", "failed to parse esp", {
+            path: pluginsIn[pluginName].filePath,
+            error: err.message,
+          });
+          pluginsParsed[pluginName] = {
+            isMaster: false,
+            isLight: false,
+            isMedium: false,
+            isBlueprint: false,
+            parseFailed: true,
+            description: "",
+            author: "",
+            masterList: [],
+            revision: 999,
+          };
+        }
+      })
       .then(
         () =>
-          new Promise((resolve, reject) => {
+          new Promise<void>((resolve, reject) => {
             if (this.mUpdateId !== updateId) {
               return reject(new util.ProcessCanceled("new update started"));
             }
@@ -1069,19 +1069,20 @@ class PluginList extends ComponentEx<IProps, IComponentState> {
   }
 
   private eslifySelected = (pluginIds: string[]) => {
-    Promise.map(
-      pluginIds
-        .map((pluginId) => this.state.pluginsCombined[pluginId])
-        .filter(
-          (plugin) =>
-            plugin !== undefined &&
-            plugin.deployed &&
-            plugin.isValidAsLightPlugin &&
-            !plugin.isLight &&
-            plugin.id.toLowerCase().endsWith(".esp"),
-        ),
-      (plugin) => this.eslify(plugin, true),
-    )
+    util
+      .map(
+        pluginIds
+          .map((pluginId) => this.state.pluginsCombined[pluginId])
+          .filter(
+            (plugin) =>
+              plugin !== undefined &&
+              plugin.deployed &&
+              plugin.isValidAsLightPlugin &&
+              !plugin.isLight &&
+              plugin.id.toLowerCase().endsWith(".esp"),
+          ),
+        (plugin) => this.eslify(plugin, true),
+      )
       .then(() => {
         this.props.onRefreshPlugins();
       })
@@ -1100,18 +1101,19 @@ class PluginList extends ComponentEx<IProps, IComponentState> {
   };
 
   private uneslifySelected = (pluginIds: string[]) => {
-    Promise.map(
-      pluginIds
-        .map((pluginId) => this.state.pluginsCombined[pluginId])
-        .filter(
-          (plugin) =>
-            plugin !== undefined &&
-            plugin.deployed &&
-            plugin.isLight &&
-            plugin.id.toLowerCase().endsWith(".esp"),
-        ),
-      (plugin) => this.eslify(plugin, false),
-    )
+    util
+      .map(
+        pluginIds
+          .map((pluginId) => this.state.pluginsCombined[pluginId])
+          .filter(
+            (plugin) =>
+              plugin !== undefined &&
+              plugin.deployed &&
+              plugin.isLight &&
+              plugin.id.toLowerCase().endsWith(".esp"),
+          ),
+        (plugin) => this.eslify(plugin, false),
+      )
       .then(() => {
         this.props.onRefreshPlugins();
       })

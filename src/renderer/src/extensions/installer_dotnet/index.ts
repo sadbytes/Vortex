@@ -2,8 +2,6 @@ import { execFile, spawn } from "child_process";
 import path from "path";
 import { promisify } from "util";
 
-import Bluebird from "bluebird";
-
 import type { ITestResult, IExtensionApi, IExtensionContext } from "../../types/api";
 import { getVortexPath, UserCanceled } from "../../util/api";
 import { log } from "../../util/log";
@@ -261,7 +259,7 @@ async function checkNetInstall(api: IExtensionApi, dotnetVersion: number): Promi
         '[spoiler label="Show detailed error"]{{stderr}}[/spoiler]',
       replace: { stderr: stderr.replace(/\n/g, "[br][/br]") },
     },
-    automaticFix: () => Bluebird.resolve(installDotNet(api, false, dotnetVersion)),
+    automaticFix: () => Promise.resolve(installDotNet(api, false, dotnetVersion)),
     severity: "fatal",
   };
 
@@ -276,7 +274,7 @@ const main = (context: IExtensionContext): boolean => {
 
   // Register .NET Desktop Runtime check
   context.registerTest("dotnet-installed", "startup", () =>
-    Bluebird.resolve(checkNetInstall(context.api, dotnetVersion)),
+    Promise.resolve(checkNetInstall(context.api, dotnetVersion)),
   );
 
   // Set up API extension once initialization is complete

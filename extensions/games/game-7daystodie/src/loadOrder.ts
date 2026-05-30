@@ -89,7 +89,7 @@ export async function serialize(
   util.batchDispatch(context.api.store, batchedActions);
 
   // Write the prefixed LO to file.
-  await fs.removeAsync(loFilePath).catch({ code: "ENOENT" }, () => Promise.resolve());
+  await fs.removeAsync(loFilePath).catch(util.only({ code: "ENOENT" }, () => Promise.resolve()));
   await util.writeFileAtomic(loFilePath, JSON.stringify(prefixedLO));
   return Promise.resolve();
 }

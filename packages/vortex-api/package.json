@@ -81,8 +81,6 @@
     "vitest": "catalog:"
   },
   "peerDependencies": {
-    "@types/bluebird": "catalog:",
-    "bluebird": "catalog:",
     "fs-extra": "catalog:",
     "immutability-helper": "catalog:",
     "minimatch": "catalog:",

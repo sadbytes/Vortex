@@ -99,7 +99,7 @@ async function updatePluginOrder(iniFilePath, plugins) {
 async function updatePluginTimestamps(dataPath, plugins) {
   const offset = 946684800;
   const oneDay = 24 * 60 * 60;
-  return Promise.mapSeries(plugins, (fileName, idx) => {
+  return util.mapSeries(plugins, (fileName, idx) => {
     const mtime = offset + oneDay * idx;
     return fs
       .utimesAsync(path.join(dataPath, fileName), mtime, mtime)

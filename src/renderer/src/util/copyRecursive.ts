@@ -1,8 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
 
-import PromiseBB from "bluebird";
-
 const MAX_PARALLEL_DIR = 16;
 const MAX_PARALLEL_FILE = 4;
 const BUFFER_SIZE = 256 * 1024;
@@ -87,8 +85,8 @@ function copyDir(
  * @param {string} source source path to copy from
  * @param {string} destination destination path to copy to
  */
-function copyRecursive(source: string, destination: string): PromiseBB<void> {
-  return new PromiseBB<void>((resolve, reject) => {
+function copyRecursive(source: string, destination: string): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
     const queue = {
       dir: Array<string>(),
       file: Array<string>(),

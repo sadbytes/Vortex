@@ -1,7 +1,6 @@
 import * as https from "https";
 import * as url from "url";
 
-import PromiseBB from "bluebird";
 import * as _ from "lodash";
 import * as semver from "semver";
 
@@ -98,31 +97,31 @@ class GitHub {
     return `https://raw.githubusercontent.com/Nexus-Mods/${repo}`;
   }
 
-  private mReleaseCache: PromiseBB<IGitHubRelease[]> | undefined;
+  private mReleaseCache: Promise<IGitHubRelease[]> | undefined;
   private mRatelimitReset: number;
 
-  public releases(): PromiseBB<IGitHubRelease[]> {
+  public releases(): Promise<IGitHubRelease[]> {
     if (this.mReleaseCache === undefined) {
       this.mReleaseCache = this.queryReleases().catch((err) => {
         this.mReleaseCache = undefined;
-        return PromiseBB.reject(err);
+        return Promise.reject(err);
       });
     }
 
     return this.mReleaseCache;
   }
 
-  public fetchConfig(config: string): PromiseBB<any> {
+  public fetchConfig(config: string): Promise<any> {
     return this.query(GitHub.rawUrl(), `${GitHub.CONFIG_BRANCH}/${config}.json`);
   }
 
-  private query(baseUrl: string, request: string): PromiseBB<any> {
+  private query(baseUrl: string, request: string): Promise<any> {
     if (this.mRatelimitReset !== undefined && this.mRatelimitReset > Date.now()) {
-      return PromiseBB.reject(new RateLimitExceeded());
+      return Promise.reject(new RateLimitExceeded());
     }
     const stackErr = new Error();
 
-    return new PromiseBB((resolve, reject) => {
+    return new Promise((resolve, reject) => {
       const relUrl = new URL(`${baseUrl}/${request}`);
       const options: https.RequestOptions = {
         port: relUrl.port,
@@ -167,16 +166,16 @@ class GitHub {
     });
   }
 
-  private queryReleases(): PromiseBB<IGitHubRelease[]> {
+  private queryReleases(): Promise<IGitHubRelease[]> {
     return this.query(GitHub.repoUrl(), "releases").then((releases: IGitHubRelease[]) => {
       if (!Array.isArray(releases)) {
-        return PromiseBB.reject(new DataInvalid("expected array of github releases"));
+        return Promise.reject(new DataInvalid("expected array of github releases"));
       }
       const current = releases
         .filter((rel) => semver.valid(rel.name) && semver.gte(rel.name, GitHub.RELEASE_CUTOFF))
         .sort((lhs, rhs) => semver.compare(lhs.name, rhs.name));
 
-      return PromiseBB.resolve(current);
+      return Promise.resolve(current);
     });
   }
 }

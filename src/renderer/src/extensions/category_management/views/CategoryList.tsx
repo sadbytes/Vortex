@@ -1,5 +1,4 @@
 import { unknownToError } from "@vortex/shared";
-import type PromiseBB from "bluebird";
 import * as React from "react";
 import { FormControl } from "react-bootstrap";
 import type * as SortableTreeT from "react-sortable-tree";
@@ -65,7 +64,7 @@ interface IActionProps {
     title: string,
     content: IDialogContent,
     actions: DialogActions,
-  ) => PromiseBB<IDialogResult>;
+  ) => Promise<IDialogResult>;
 }
 
 interface IConnectedProps {

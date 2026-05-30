@@ -1,7 +1,5 @@
 import * as path from "path";
 
-import Bluebird from "bluebird";
-
 import type { IExtensionApi } from "../../../types/IExtensionContext";
 import * as fs from "../../../util/fs";
 import getVortexPath from "../../../util/getVortexPath";
@@ -40,7 +38,7 @@ async function removeProfileImpl(api: IExtensionApi, profile: IProfile) {
   return fs
     .removeAsync(profilePath(state.persistent.profiles[profile.id]))
     .then(() => doRemoveProfile())
-    .catch((err) =>
+    .catch((err: any) =>
       err.code === "ENOENT"
         ? doRemoveProfile() // Profile path is already missing, that's fine.
         : api.showErrorNotification("Failed to remove profile", err, {
@@ -69,7 +67,7 @@ export function removeProfile(api: IExtensionApi, profileId: string): boolean {
 
   if (removeProfilePP === undefined) {
     removeProfilePP = api.withPrePost("remove-profile", (profileInner: IProfile) =>
-      Bluebird.resolve(removeProfileImpl(api, profileInner)),
+      Promise.resolve(removeProfileImpl(api, profileInner)),
     );
   }
 

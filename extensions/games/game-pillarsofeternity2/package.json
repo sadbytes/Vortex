@@ -14,7 +14,6 @@
     "game": "Pillars of Eternity 2: Deadfire"
   },
   "devDependencies": {
-    "@types/bluebird": "catalog:",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/react-bootstrap": "catalog:",
@@ -22,7 +21,6 @@
     "@types/redux": "catalog:",
     "@types/redux-thunk": "catalog:",
     "@types/semver": "catalog:",
-    "bluebird": "catalog:",
     "copyfiles": "catalog:",
     "react": "catalog:",
     "react-dnd": "catalog:",

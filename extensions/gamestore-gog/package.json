@@ -14,9 +14,7 @@
     "extensionName": "Game Store: GOG"
   },
   "devDependencies": {
-    "@types/bluebird": "catalog:",
     "@types/node": "catalog:",
-    "bluebird": "catalog:",
     "copyfiles": "catalog:",
     "typescript": "catalog:",
     "@nexusmods/vortex-api": "workspace:*",

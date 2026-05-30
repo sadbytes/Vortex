@@ -4,7 +4,6 @@ import * as path from "path";
 import * as nodeUtil from "util";
 
 import { actions, fs, log, selectors, types, util } from "@nexusmods/vortex-api";
-import Promise from "bluebird";
 import I18next from "i18next";
 import * as Redux from "redux";
 import { createSelector } from "reselect";
@@ -104,7 +103,7 @@ function isPlugin(filePath: string, fileName: string, gameMode: string): Promise
   ) {
     return Promise.resolve(false);
   }
-  return isFile(path.join(filePath, fileName)).catch(util.UserCanceled, () => false);
+  return isFile(path.join(filePath, fileName)).catch(util.only(util.UserCanceled, () => false));
 }
 
 /**
@@ -160,37 +159,44 @@ function updatePluginListImpl(
   const installBasePath = selectors.installPathForGame(state, gameId);
   // create a cache of all plugins that originate from a mod so we can assign
   // the correct origin further down
-  return Promise.map(enabledModIds, (modId: string) => {
-    const mod = gameMods[modId];
-    if (mod === undefined || mod.installationPath === undefined) {
-      log("error", "mod not found", { gameId, modId });
-      return;
-    }
-    const isOverriden = (fileName: string) =>
-      (mod.fileOverrides ?? []).some((override) => path.basename(override) === fileName);
-    const modInstPath = path.join(installBasePath, mod.installationPath);
-    return fs
-      .readdirAsync(modInstPath)
-      .map((fileName) =>
-        activator !== undefined ? (activator as any).getDeployedPath(fileName) : fileName,
-      )
-      .filter((fileName: string) =>
-        isPlugin(modInstPath, fileName, gameId).then((res) =>
-          Promise.resolve(res && !isOverriden(fileName)),
-        ),
-      )
-      .each((fileName: string) => {
-        pluginSources[fileName] = mod.id;
-        return setPluginState(modInstPath, fileName, false);
-      })
-      .catch((err: Error) => {
-        readErrors.push(mod.id);
-        log("warn", "failed to read mod directory", {
-          path: mod.installationPath,
-          error: err.message,
+  return util
+    .map(enabledModIds, (modId: string) => {
+      const mod = gameMods[modId];
+      if (mod === undefined || mod.installationPath === undefined) {
+        log("error", "mod not found", { gameId, modId });
+        return;
+      }
+      const isOverriden = (fileName: string) =>
+        (mod.fileOverrides ?? []).some((override) => path.basename(override) === fileName);
+      const modInstPath = path.join(installBasePath, mod.installationPath);
+      return fs
+        .readdirAsync(modInstPath)
+        .then((__arr) =>
+          util.map(__arr, (fileName) =>
+            activator !== undefined ? (activator as any).getDeployedPath(fileName) : fileName,
+          ),
+        )
+        .then((__a) =>
+          util.filter(__a, (fileName: string) =>
+            isPlugin(modInstPath, fileName, gameId).then((res) =>
+              Promise.resolve(res && !isOverriden(fileName)),
+            ),
+          ),
+        )
+        .then((__a) =>
+          util.each(__a, (fileName: string) => {
+            pluginSources[fileName] = mod.id;
+            return setPluginState(modInstPath, fileName, false);
+          }),
+        )
+        .catch((err: Error) => {
+          readErrors.push(mod.id);
+          log("warn", "failed to read mod directory", {
+            path: mod.installationPath,
+            error: err.message,
+          });
         });
-      });
-  })
+    })
     .then(() => {
       if (readErrors.length > 0) {
         util.showError(
@@ -213,8 +219,11 @@ function updatePluginListImpl(
       return fs.readdirAsync(modPath).catch((err) => []);
     })
     .then(async (fileNames: string[]) => {
-      return Promise.filter(fileNames, (val) => isPlugin(modPath, val, gameId))
-        .each((fileName: string) => setPluginState(modPath, fileName, true))
+      return util
+        .filter(fileNames, (val) => isPlugin(modPath, val, gameId))
+        .then((__arr) =>
+          util.each(__arr, (fileName: string) => setPluginState(modPath, fileName, true)),
+        )
         .then(async () => {
           store.dispatch(setPluginList(pluginStates));
           if (Object.keys(pluginStates).length > 0) {
@@ -524,7 +533,7 @@ function register(
           await loot.downloadMasterlist(profile.gameId);
         }
         await updatePluginList(context.api.store, profile.modState, profile.gameId);
-        await new Promise((resolve, reject) => {
+        await new Promise<void>((resolve, reject) => {
           const pluginList = util.getSafe(
             context.api.getState(),
             ["session", "plugins", "pluginList"],
@@ -959,7 +968,7 @@ function testPluginsLocked(gameMode: string): Promise<types.ITestResult> {
 
         resolve(res);
       } else {
-        resolve();
+        resolve(undefined);
       }
     });
   });
@@ -1045,7 +1054,7 @@ function testMissingGroups(
   store: Redux.Store<IStateWithGamebryo>,
   tries: number = 10,
 ): Promise<types.ITestResult> {
-  return Promise.delay(100 * (10 - tries)).then(() => {
+  return util.delay(100 * (10 - tries)).then(() => {
     const state = store.getState();
     return state.userlist.__isLoaded && state.masterlist.__isLoaded
       ? testMissingGroupsImpl(t, store)
@@ -1596,20 +1605,21 @@ function testRulesUnfulfilled(api: types.IExtensionApi): Promise<types.ITestResu
           .then(() => true)
           .catch((err) => false);
 
-  return Promise.map(Object.keys(reqCheck), (reqId) =>
-    exists(reqId).then((existsRes) => {
-      if (!existsRes) {
-        required.push(
-          ...reqCheck[reqId].refs.map((ref) => ({
-            left: ref,
-            right: reqCheck[reqId].display,
-          })),
-        );
-      }
-    }),
-  )
+  return util
+    .map(Object.keys(reqCheck), (reqId) =>
+      exists(reqId).then((existsRes) => {
+        if (!existsRes) {
+          required.push(
+            ...reqCheck[reqId].refs.map((ref) => ({
+              left: ref,
+              right: reqCheck[reqId].display,
+            })),
+          );
+        }
+      }),
+    )
     .then(() =>
-      Promise.map(Object.keys(incCheck), (incId) =>
+      util.map(Object.keys(incCheck), (incId) =>
         exists(incId).then((existsRes) => {
           if (existsRes) {
             incompatible.push(
@@ -1854,10 +1864,14 @@ function init(context: IExtensionContextExt) {
             const activator = util.getCurrentActivator(state, gameId, true);
 
             fs.readdirAsync(modInstPath)
-              .map((fileName: string) =>
-                activator ? activator.getDeployedPath(fileName) : fileName,
+              .then((__arr) =>
+                util.map(__arr, (fileName: string) =>
+                  activator ? activator.getDeployedPath(fileName) : fileName,
+                ),
               )
-              .filter((fileName: string) => isPlugin(modInstPath, fileName, gameId))
+              .then((__a) =>
+                util.filter(__a, (fileName: string) => isPlugin(modInstPath, fileName, gameId)),
+              )
               .then((pluginFileNames: string[]) => {
                 if (pluginFileNames.length === 0) {
                   return;
@@ -2169,8 +2183,8 @@ function init(context: IExtensionContextExt) {
                   }
                 }
               })
-              .catch(util.ProcessCanceled, () => undefined)
-              .catch(util.UserCanceled, () => undefined)
+              .catch(util.only(util.ProcessCanceled, () => undefined))
+              .catch(util.only(util.UserCanceled, () => undefined))
               .catch((err) => {
                 context.api.showErrorNotification("Failed to read mod", err);
               });

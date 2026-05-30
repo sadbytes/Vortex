@@ -2847,7 +2847,7 @@ class InstallManager {
               }
               resolve();
             })
-            .catch((err) => {
+            .catch((err: Error) => {
               log("warn", "deploy-mods failed after phase settle", {
                 sourceModId,
                 phase: checkPhase,

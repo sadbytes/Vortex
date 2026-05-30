@@ -1,8 +1,6 @@
 import * as path from "path";
 
 import { fs, util } from "@nexusmods/vortex-api";
-import Promise from "bluebird";
-
 /**
  * copy or move a list of mod archives
  * @param {string} modArchive

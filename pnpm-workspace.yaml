@@ -70,7 +70,6 @@ catalog:
   "@types/babel__register": 7.17.3
   "@types/bbcode-to-react": 0.2.4
   "@types/big.js": 6.2.2
-  "@types/bluebird": 3.5.20
   "@types/content-disposition": 0.5.9
   "@types/content-type": 1.1.9
   "@types/copyfiles": 2.4.4
@@ -130,7 +129,6 @@ catalog:
   "@welldone-software/why-did-you-render": 10.0.1
   bbcode-to-react: git+https://github.com/TanninOne/bbcode-to-react#c67356006470e5066ea447e04a3968dca367339d
   big.js: 5.2.2
-  bluebird: 3.7.2
   bootstrap-sass: 3.4.3
   bs58: 4.0.1
   bsatk: git+https://github.com/Nexus-Mods/node-bsatk#5a3d15fae2177bfb0a42b794d3afb21eda563c59

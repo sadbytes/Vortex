@@ -2,7 +2,6 @@ import * as fs from "fs";
 import * as path from "path";
 
 import { getErrorCode, unknownToError } from "@vortex/shared";
-import PromiseBB from "bluebird";
 
 import { setToolRunning, setToolStopped } from "../actions";
 import { ApplicationData } from "../applicationData";
@@ -16,6 +15,7 @@ import type { IExtensionApi } from "../types/IExtensionContext";
 import type { IGame } from "../types/IGame";
 import { GameEntryNotFound, GameStoreNotFound } from "../types/IGameStore";
 import { getApplication } from "./application";
+import { only } from "./asyncpromise";
 import {
   MissingDependency,
   MissingInterpreter,
@@ -129,10 +129,10 @@ class StarterInfo implements IStarterInfo {
     const game: IGame = getGame(info.gameId);
     // Determine if game requires a specific launcher (Steam, Epic, etc.)
     // On Linux, Steam games run through Proton directly rather than via steam -applaunch
-    const launcherPromise: PromiseBB<{ launcher: string; addInfo?: any }> =
+    const launcherPromise: Promise<{ launcher: string; addInfo?: any }> =
       game.requiresLauncher !== undefined && info.isGame
-        ? PromiseBB.resolve(game.requiresLauncher(path.dirname(info.exePath), info.store)).catch(
-            (err) => {
+        ? Promise.resolve(game.requiresLauncher(path.dirname(info.exePath), info.store)).catch(
+            (err: any) => {
               if (err instanceof UserCanceled) {
                 // warning because it'd be kind of unusual for the user to have to confirm anything
                 // in requiresLauncher
@@ -152,10 +152,10 @@ class StarterInfo implements IStarterInfo {
                   log("error", "failed to determine if launcher is required", errorObj.message);
                 }
               }
-              return PromiseBB.resolve(undefined);
+              return Promise.resolve(undefined);
             },
           )
-        : PromiseBB.resolve(undefined);
+        : Promise.resolve(undefined);
 
     const onSpawned = () => {
       api.store.dispatch(setToolRunning(info.exePath, Date.now(), info.exclusive));
@@ -193,21 +193,25 @@ class StarterInfo implements IStarterInfo {
               getApplication().quit();
             }
           })
-          .catch(UserCanceled, () => null)
-          .catch(GameEntryNotFound, (err) => {
-            const errorMsg = [err.message, err.storeName, err.existingGames].join(" - ");
-            log("error", errorMsg);
-            onShowError("Failed to start game through launcher", err, !game.contributed);
-            return StarterInfo.runDirectly(info, api, onShowError, onSpawned);
-          })
-          .catch(GameStoreNotFound, (err) => {
-            onShowError(
-              "Failed to start game through launcher",
-              `Game store "${err.storeName}" not supported, is the extension disabled?`,
-              false,
-            );
-            return StarterInfo.runDirectly(info, api, onShowError, onSpawned);
-          })
+          .catch(only(UserCanceled, () => null))
+          .catch(
+            only(GameEntryNotFound, (err) => {
+              const errorMsg = [err.message, err.storeName, err.existingGames].join(" - ");
+              log("error", errorMsg);
+              onShowError("Failed to start game through launcher", err, !game.contributed);
+              return StarterInfo.runDirectly(info, api, onShowError, onSpawned);
+            }),
+          )
+          .catch(
+            only(GameStoreNotFound, (err) => {
+              onShowError(
+                "Failed to start game through launcher",
+                `Game store "${err.storeName}" not supported, is the extension disabled?`,
+                false,
+              );
+              return StarterInfo.runDirectly(info, api, onShowError, onSpawned);
+            }),
+          )
           .catch((err) => {
             onShowError("Failed to start game through launcher", err, true);
             return StarterInfo.runDirectly(info, api, onShowError, onSpawned);
@@ -289,20 +293,22 @@ class StarterInfo implements IStarterInfo {
         detach: info.detach || info.onStart === "close",
         onSpawned: spawned,
       })
-      .catch(ProcessCanceled, () => undefined)
-      .catch(UserCanceled, () => undefined)
-      .catch(MissingDependency, () => {
-        onShowError(
-          "Failed to run tool",
-          {
-            executable: info.exePath,
-            message:
-              "An Application/Tool dependency is missing, please consult the " +
-              "Application/Tool documentation for required dependencies.",
-          },
-          false,
-        );
-      })
+      .catch(only(ProcessCanceled, () => undefined))
+      .catch(only(UserCanceled, () => undefined))
+      .catch(
+        only(MissingDependency, () => {
+          onShowError(
+            "Failed to run tool",
+            {
+              executable: info.exePath,
+              message:
+                "An Application/Tool dependency is missing, please consult the " +
+                "Application/Tool documentation for required dependencies.",
+            },
+            false,
+          );
+        }),
+      )
       .catch((unknownError) => {
         const code = getErrorCode(unknownError);
         const err = unknownToError(unknownError);
@@ -375,17 +381,17 @@ class StarterInfo implements IStarterInfo {
     info: IStarterInfo,
     api: IExtensionApi,
     addInfo: any,
-  ): PromiseBB<void> {
+  ): Promise<void> {
     let gameLauncher;
     try {
       gameLauncher = GameStoreHelper.getGameStore(launcher);
     } catch (err) {
-      return PromiseBB.reject(err);
+      return Promise.reject(err);
     }
     const infoObj = addInfo !== undefined ? addInfo : path.dirname(info.exePath);
     return gameLauncher !== undefined
       ? gameLauncher.launchGame(infoObj, api)
-      : PromiseBB.reject(new Error(`unsupported launcher ${launcher}`));
+      : Promise.reject(new Error(`unsupported launcher ${launcher}`));
   }
 
   private static gameIcon(gameId: string, extensionPath: string, logo: string) {

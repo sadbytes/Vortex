@@ -1,7 +1,6 @@
 import * as path from "path";
 
 import { getErrorMessageOrDefault } from "@vortex/shared";
-import PromiseBB from "bluebird";
 import * as React from "react";
 import {
   Button as BSButton,
@@ -35,6 +34,7 @@ import type {
 } from "../../../types/IDialog";
 import type { IDownload, IState } from "../../../types/IState";
 import type { ValidationState } from "../../../types/ITableAttribute";
+import { only } from "../../../util/asyncpromise";
 import {
   CleanupFailedException,
   InsufficientDiskSpace,
@@ -100,7 +100,7 @@ interface IActionProps {
     title: string,
     content: IDialogContent,
     actions: DialogActions,
-  ) => PromiseBB<IDialogResult>;
+  ) => Promise<IDialogResult>;
   onShowError: (
     message: string,
     details: string | Error,
@@ -530,7 +530,7 @@ class Settings extends ComponentEx<IProps, IComponentState> {
               this.nextState.busy = t("Moving download folder");
               return this.transferPath().then(() => writeDownloadsTag(this.context.api, newPath));
             } else {
-              return PromiseBB.resolve();
+              return Promise.resolve();
             }
           })
           .then(() => {
@@ -538,48 +538,54 @@ class Settings extends ComponentEx<IProps, IComponentState> {
             onSetDownloadPath(this.state.downloadPath);
             this.context.api.events.emit("did-move-downloads");
           })
-          .catch(UserCanceled, () => null)
-          .catch(CleanupFailedException, (err) => {
-            deleteOldDestination = false;
-            onSetTransfer(undefined);
-            onSetDownloadPath(this.state.downloadPath);
-            this.context.api.events.emit("did-move-downloads");
-            onShowDialog(
-              "info",
-              "Cleanup failed",
-              {
-                bbcode: t(
-                  "The downloads folder has been copied [b]successfully[/b] to " +
-                    "your chosen destination!<br />" +
-                    "Clean-up of the old downloads folder has been cancelled.<br /><br />" +
-                    `Old downloads folder: [url]{{thePath}}[/url]`,
-                  { replace: { thePath: oldPath } },
-                ),
-              },
-              [{ label: "Close", action: () => PromiseBB.resolve() }],
-            );
+          .catch(only(UserCanceled, () => null))
+          .catch(
+            only(CleanupFailedException, (err) => {
+              deleteOldDestination = false;
+              onSetTransfer(undefined);
+              onSetDownloadPath(this.state.downloadPath);
+              this.context.api.events.emit("did-move-downloads");
+              onShowDialog(
+                "info",
+                "Cleanup failed",
+                {
+                  bbcode: t(
+                    "The downloads folder has been copied [b]successfully[/b] to " +
+                      "your chosen destination!<br />" +
+                      "Clean-up of the old downloads folder has been cancelled.<br /><br />" +
+                      `Old downloads folder: [url]{{thePath}}[/url]`,
+                    { replace: { thePath: oldPath } },
+                  ),
+                },
+                [{ label: "Close", action: () => Promise.resolve() }],
+              );
 
-            if (!(err.errorObject instanceof UserCanceled)) {
-              this.context.api.showErrorNotification("Clean-up failed", err.errorObject);
-            }
-          })
-          .catch(InsufficientDiskSpace, () => notEnoughDiskSpace())
-          .catch(UnsupportedOperatingSystem, () =>
-            onShowError(
-              "Unsupported operating system",
-              "This functionality is currently unavailable for your operating system!",
-              false,
+              if (!(err.errorObject instanceof UserCanceled)) {
+                this.context.api.showErrorNotification("Clean-up failed", err.errorObject);
+              }
+            }),
+          )
+          .catch(only(InsufficientDiskSpace, () => notEnoughDiskSpace()))
+          .catch(
+            only(UnsupportedOperatingSystem, () =>
+              onShowError(
+                "Unsupported operating system",
+                "This functionality is currently unavailable for your operating system!",
+                false,
+              ),
             ),
           )
-          .catch(NotFound, () =>
-            onShowError(
-              "Invalid destination",
-              "The destination partition you selected is invalid - please choose a different " +
-                "destination",
-              false,
+          .catch(
+            only(NotFound, () =>
+              onShowError(
+                "Invalid destination",
+                "The destination partition you selected is invalid - please choose a different " +
+                  "destination",
+                false,
+              ),
             ),
           )
-          .catch((err) => {
+          .catch((err: any) => {
             if (err !== null) {
               if (err.code === "EPERM") {
                 onShowError("Directories are locked", err, false);
@@ -640,10 +646,12 @@ class Settings extends ComponentEx<IProps, IComponentState> {
                   onSetTransfer(undefined);
                   this.nextState.busy = undefined;
                 })
-                .catch(UserCanceled, () => {
-                  this.nextState.busy = undefined;
-                })
-                .catch((err) => {
+                .catch(
+                  only(UserCanceled, () => {
+                    this.nextState.busy = undefined;
+                  }),
+                )
+                .catch((err: any) => {
                   this.nextState.busy = undefined;
                   if (err.code === "ENOENT") {
                     // Folder is already gone, that's fine.
@@ -667,7 +675,7 @@ class Settings extends ComponentEx<IProps, IComponentState> {
     );
   };
 
-  private confirmElevate = (): PromiseBB<void> => {
+  private confirmElevate = (): Promise<void> => {
     const { t, onShowDialog } = this.props;
     return onShowDialog(
       "question",
@@ -680,12 +688,12 @@ class Settings extends ComponentEx<IProps, IComponentState> {
       },
       [{ label: "Cancel" }, { label: "Create as Administrator" }],
     ).then((result) =>
-      result.action === "Cancel" ? PromiseBB.reject(new UserCanceled()) : PromiseBB.resolve(),
+      result.action === "Cancel" ? Promise.reject(new UserCanceled()) : Promise.resolve(),
     );
   };
 
   private checkTargetEmpty(oldDownloadPath: string, newDownloadPath: string) {
-    let queue = PromiseBB.resolve();
+    let queue = Promise.resolve();
     let fileCount = 0;
     let hasDownloadTag: boolean = false;
     let tagInstance: string;
@@ -717,7 +725,7 @@ class Settings extends ComponentEx<IProps, IComponentState> {
     // ensure the destination directories are empty
     return queue.then(
       () =>
-        new PromiseBB((resolve, reject) => {
+        new Promise<void>((resolve, reject) => {
           if (fileCount > 0 && tagInstance !== this.props.instanceId) {
             if (tagInstance !== undefined) {
               return this.props.onShowDialog(
@@ -774,7 +782,7 @@ class Settings extends ComponentEx<IProps, IComponentState> {
     let sourceIsMissing = false;
     return fs
       .statAsync(oldPath)
-      .catch((err) => {
+      .catch((err: any) => {
         // The initial downloads folder is missing! this may be a valid case if:
         //  1. HDD or removable media is faulty or has become unseated and is
         //  no longer detectable by the OS.
@@ -786,12 +794,12 @@ class Settings extends ComponentEx<IProps, IComponentState> {
         //  error cases pop up.
         sourceIsMissing = ["ENOENT", "UNKNOWN"].indexOf(err.code) !== -1;
         log("warn", "Transfer failed - missing source directory", err);
-        return sourceIsMissing ? PromiseBB.resolve(undefined) : PromiseBB.reject(err);
+        return sourceIsMissing ? Promise.resolve(undefined) : Promise.reject(err);
       })
       .then((stats) => {
         const queryReset =
           stats !== undefined
-            ? PromiseBB.resolve()
+            ? Promise.resolve()
             : onShowDialog(
                 "question",
                 "Missing downloads folder",
@@ -811,9 +819,7 @@ class Settings extends ComponentEx<IProps, IComponentState> {
                 },
                 [{ label: "Cancel" }, { label: "Reinitialize" }],
               ).then((result) =>
-                result.action === "Cancel"
-                  ? PromiseBB.reject(new UserCanceled())
-                  : PromiseBB.resolve(),
+                result.action === "Cancel" ? Promise.reject(new UserCanceled()) : Promise.resolve(),
               );
 
         return queryReset.then(() => {
@@ -826,8 +832,8 @@ class Settings extends ComponentEx<IProps, IComponentState> {
             if (this.state.progressFile !== from && Date.now() - this.mLastFileUpdate > 1000) {
               this.nextState.progressFile = path.basename(from);
             }
-          }).catch((err) =>
-            sourceIsMissing && err.path === oldPath ? PromiseBB.resolve() : PromiseBB.reject(err),
+          }).catch((err: any) =>
+            sourceIsMissing && err.path === oldPath ? Promise.resolve() : Promise.reject(err),
           );
         });
       });

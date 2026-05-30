@@ -1,7 +1,6 @@
 import * as path from "path";
 
 import { fs, log, types, util } from "@nexusmods/vortex-api";
-import Bluebird from "bluebird";
 
 import * as actions from "./actions";
 import { themesPath } from "./util";
@@ -10,9 +9,13 @@ let themes: string[] = [];
 
 export function readThemes() {
   const bundledPath = path.join(__dirname, "themes");
-  return util.readExtensibleDir("theme", bundledPath, themesPath()).tap((extThemes) => {
-    themes = extThemes;
-  });
+  return util.readExtensibleDir("theme", bundledPath, themesPath()).then((__v) =>
+    Promise.resolve(
+      ((extThemes) => {
+        themes = extThemes;
+      })(__v),
+    ).then(() => __v),
+  );
 }
 
 export function themeName(location: string): string {
@@ -64,7 +67,7 @@ export function cloneTheme(
   api: types.IExtensionApi,
   themeName: string,
   newName: string,
-): Bluebird<void> {
+): Promise<void> {
   const t = api.translate;
 
   if (newName && themes.findIndex((iter) => path.basename(iter) === newName) === -1) {
@@ -75,7 +78,7 @@ export function cloneTheme(
       // this should be unreachable from the UI.
       const err = new Error("no path for current theme");
       (err as { allowReport?: boolean }).allowReport = false;
-      return Bluebird.reject(err);
+      return Promise.reject(err);
     }
     api.events.emit("analytics-track-click-event", "Themes", "Clone theme");
 
@@ -83,9 +86,11 @@ export function cloneTheme(
       .ensureDirAsync(targetPath)
       .then(() => readThemeVariables(themeName))
       .then((variables) => saveThemeInternal(path.join(themesPath(), newName), variables))
-      .then(() => (sourcePath !== undefined ? fs.readdirAsync(sourcePath) : Bluebird.resolve([])))
-      .map((files: string) =>
-        fs.copyAsync(path.join(sourcePath, files), path.join(targetPath, files)),
+      .then(() => (sourcePath !== undefined ? fs.readdirAsync(sourcePath) : Promise.resolve([])))
+      .then((__arr) =>
+        util.map(__arr, (files: string) =>
+          fs.copyAsync(path.join(sourcePath, files), path.join(targetPath, files)),
+        ),
       )
       .then(() => {
         themes.push(targetPath);
@@ -101,17 +106,17 @@ export function cloneTheme(
         ),
       );
   } else {
-    return Bluebird.reject(new util.ArgumentInvalid("Name already used"));
+    return Promise.reject(new util.ArgumentInvalid("Name already used"));
     // cloneTheme(api, themeName, themes, t('Name already used.'));
   }
 }
 
-export function readThemeVariables(themeName: string): Bluebird<{ [key: string]: string }> {
+export function readThemeVariables(themeName: string): Promise<{ [key: string]: string }> {
   const currentThemePath = themePath(themeName);
   if (currentThemePath === undefined) {
     // likely was deleted outside Vortex
     log("warn", "theme not found", themeName);
-    return Bluebird.resolve({});
+    return Promise.resolve({});
   }
 
   // single and multiline comments

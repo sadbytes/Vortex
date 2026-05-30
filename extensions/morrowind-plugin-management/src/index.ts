@@ -1,7 +1,6 @@
 import * as path from "path";
 
 import { fs, log, selectors, types, util } from "@nexusmods/vortex-api";
-import Promise from "bluebird";
 import IniParser, { WinapiFormat } from "vortex-parse-ini";
 
 import PluginList from "./PluginList";
@@ -68,12 +67,14 @@ function updatePluginOrder(iniFilePath: string, plugins: string[]) {
 function updatePluginTimestamps(dataPath: string, plugins: string[]): Promise<void> {
   const offset = 946684800;
   const oneDay = 24 * 60 * 60;
-  return Promise.mapSeries(plugins, (fileName, idx) => {
-    const mtime = offset + oneDay * idx;
-    return fs
-      .utimesAsync(path.join(dataPath, fileName), mtime, mtime)
-      .catch((err) => (err.code === "ENOENT" ? Promise.resolve() : Promise.reject(err)));
-  }).then(() => undefined);
+  return util
+    .mapSeries(plugins, (fileName, idx) => {
+      const mtime = offset + oneDay * idx;
+      return fs
+        .utimesAsync(path.join(dataPath, fileName), mtime, mtime)
+        .catch((err) => (err.code === "ENOENT" ? Promise.resolve() : Promise.reject(err)));
+    })
+    .then(() => undefined);
 }
 
 function refreshPlugins(api: types.IExtensionApi): Promise<void> {
@@ -85,8 +86,11 @@ function refreshPlugins(api: types.IExtensionApi): Promise<void> {
 
   return fs
     .readdirAsync(path.join(discovery.path, "Data Files"))
-    .filter(
-      (fileName: string) => [".esp", ".esm"].indexOf(path.extname(fileName).toLowerCase()) !== -1,
+    .then((__arr) =>
+      util.filter(
+        __arr,
+        (fileName: string) => [".esp", ".esm"].indexOf(path.extname(fileName).toLowerCase()) !== -1,
+      ),
     )
     .then((plugins) =>
       readGameFiles(path.join(discovery.path, "Morrowind.ini")).then((gameFiles) => ({

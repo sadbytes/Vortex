@@ -16,7 +16,6 @@
   "devDependencies": {
     "@types/redux": "catalog:",
     "@types/semver": "catalog:",
-    "bluebird": "catalog:",
     "copyfiles": "catalog:",
     "i18next": "catalog:",
     "semver": "catalog:",

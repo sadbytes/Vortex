@@ -1,5 +1,4 @@
 import { selectors, types, util } from "@nexusmods/vortex-api";
-import Bluebird from "bluebird";
 
 import { setGameVersion } from "./actions";
 import {
@@ -127,14 +126,14 @@ function init(context: types.IExtensionContext) {
   context.registerReducer(["persistent", "gameMode"], persistentReducer);
 
   context.registerTest("game-version", "gamemode-activated", () =>
-    Bluebird.resolve(testGameVersions(context.api)),
+    Promise.resolve(testGameVersions(context.api)),
   );
   context.registerTest("game-version", "mod-installed", () =>
-    Bluebird.resolve(testGameVersions(context.api)),
+    Promise.resolve(testGameVersions(context.api)),
   );
 
   context.registerGameInfoProvider("game-version", 15, 5 * ONE_MINUTE, ["game_version"], (game) =>
-    Bluebird.resolve(queryGameInfo(context.api, game)),
+    Promise.resolve(queryGameInfo(context.api, game)),
   );
 }
 

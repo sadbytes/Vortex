@@ -1,6 +1,4 @@
 import { log, types, util } from "@nexusmods/vortex-api";
-import Promise from "bluebird";
-
 export class NotFound extends Error {
   constructor() {
     super("not found");

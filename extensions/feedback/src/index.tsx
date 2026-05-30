@@ -2,7 +2,6 @@ import * as path from "path";
 
 import { mdiCommentTextOutline } from "@mdi/js";
 import { fs, log, types, util } from "@nexusmods/vortex-api";
-import Promise from "bluebird";
 import * as tmp from "tmp";
 import * as winapiT from "winapi-bindings";
 
@@ -41,14 +40,18 @@ function findCrashDumps(): Promise<string[]> {
     .ensureDirAsync(nativeCrashesPath)
     .then(() => fs.readdirAsync(nativeCrashesPath))
     .catch(() => [])
-    .filter((filePath: string) => path.extname(filePath) === ".dmp")
-    .map((iterPath: string) => path.join(nativeCrashesPath, iterPath))
+    .then((__arr) => util.filter(__arr, (filePath: string) => path.extname(filePath) === ".dmp"))
+    .then((__arr) => util.map(__arr, (iterPath: string) => path.join(nativeCrashesPath, iterPath)))
     .then((nativeCrashes: string[]) =>
       fs
         .readdirAsync(electronCrashesPath)
         .catch(() => [])
-        .filter((filePath: string) => path.extname(filePath) === ".dmp")
-        .map((iterPath: string) => path.join(electronCrashesPath, iterPath))
+        .then((__arr) =>
+          util.filter(__arr, (filePath: string) => path.extname(filePath) === ".dmp"),
+        )
+        .then((__arr) =>
+          util.map(__arr, (iterPath: string) => path.join(electronCrashesPath, iterPath)),
+        )
         .then((electronPaths: string[]) => [].concat(nativeCrashes, electronPaths)),
     );
 }
@@ -102,33 +105,36 @@ function errorText(type: ErrorType): string {
 }
 
 function recognisedError(crashDumps: string[]): Promise<ErrorType> {
-  return Promise.map(crashDumps, (dumpPath) =>
-    fs
-      .readFileAsync(dumpPath + ".log", { encoding: "utf-8" })
-      .then((data) => {
-        try {
-          const codeLine: string[] = data
-            .split("\r\n")
-            .filter((line) => line.startsWith("Exception code"));
-          return Promise.resolve(codeLine.map((line) => line.split(": ")[1]));
-        } catch (err) {
-          return Promise.reject(new Error("Failed to parse"));
+  return util
+    .map(crashDumps, (dumpPath) =>
+      fs
+        .readFileAsync(dumpPath + ".log", { encoding: "utf-8" })
+        .then((data) => {
+          try {
+            const codeLine: string[] = data
+              .split("\r\n")
+              .filter((line) => line.startsWith("Exception code"));
+            return Promise.resolve(codeLine.map((line) => line.split(": ")[1]));
+          } catch (err) {
+            return Promise.reject(new Error("Failed to parse"));
+          }
+        })
+        .catch(() => null),
+    )
+    .then((__arr) => util.filter(__arr, (codes: string) => !!codes))
+    .then((__arr) => util.reduce(__arr, (prev, codes) => prev.concat(codes), []))
+    .then((__a) =>
+      util.filter(__a, (code: string) => {
+        const known = KNOWN_ERRORS[code];
+        if (known === undefined) {
+          return false;
         }
-      })
-      .catch(() => null),
-  )
-    .filter((codes: string) => !!codes)
-    .reduce((prev, codes) => prev.concat(codes), [])
-    .filter((code: string) => {
-      const known = KNOWN_ERRORS[code];
-      if (known === undefined) {
-        return false;
-      }
-      if (known === ErrorType.APP) {
-        return oldMSXMLLoaded();
-      }
-      return true;
-    })
+        if (known === ErrorType.APP) {
+          return oldMSXMLLoaded();
+        }
+        return true;
+      }),
+    )
     .then((codes) => (codes.length > 0 ? KNOWN_ERRORS[codes[0]] : undefined));
 }
 
@@ -151,28 +157,31 @@ function reportKnownError(api: types.IExtensionApi, dismiss: () => void, errType
 function sendCrashFeedback(api: types.IExtensionApi, dismiss: () => void, crashDumps: string[]) {
   api.store.dispatch(setFeedbackType("bugreport", "crash"));
   return (
-    Promise.map(
-      crashDumps.reduce((prev, iter) => prev.concat(iter, iter + ".log"), []),
-      (dump) =>
-        fs
-          .statAsync(dump)
-          .then((stats) => ({ filePath: dump, stats }))
-          // This shouldn't happen unless the user deleted the
-          //  crashdump before hitting the Send Report button.
-          //  Either way the application shouldn't crash; keep going.
-          .catch((err) => (err.code === "ENOENT" ? undefined : Promise.reject(err))),
-    )
-      .filter((iter) => iter !== undefined)
-      .each((iter: { filePath: string; stats: fs.Stats }) => {
-        api.store.dispatch(
-          addFeedbackFile({
-            filename: path.basename(iter.filePath),
-            filePath: iter.filePath,
-            size: iter.stats.size,
-            type: "Dump",
-          }),
-        );
-      })
+    util
+      .map(
+        crashDumps.reduce((prev, iter) => prev.concat(iter, iter + ".log"), []),
+        (dump) =>
+          fs
+            .statAsync(dump)
+            .then((stats) => ({ filePath: dump, stats }))
+            // This shouldn't happen unless the user deleted the
+            //  crashdump before hitting the Send Report button.
+            //  Either way the application shouldn't crash; keep going.
+            .catch((err) => (err.code === "ENOENT" ? undefined : Promise.reject(err))),
+      )
+      .then((__arr) => util.filter(__arr, (iter) => iter !== undefined))
+      .then((__arr) =>
+        util.each(__arr, (iter: { filePath: string; stats: fs.Stats }) => {
+          api.store.dispatch(
+            addFeedbackFile({
+              filename: path.basename(iter.filePath),
+              filePath: iter.filePath,
+              size: iter.stats.size,
+              type: "Dump",
+            }),
+          );
+        }),
+      )
       // Do we actually want to report an issue with the native
       //  crash dumps at this point? Or should we just keep going ?
       .catch(() => undefined)
@@ -193,16 +202,18 @@ function nativeCrashCheck(api: types.IExtensionApi): Promise<void> {
               {
                 title: "Dismiss",
                 action: (dismiss) => {
-                  Promise.map(crashDumps, (dump) =>
-                    fs
-                      .removeAsync(dump)
-                      .catch(() => undefined)
-                      .then(() => fs.removeAsync(dump + ".log"))
-                      .catch(() => undefined),
-                  ).then(() => {
-                    log("info", "crash dumps dismissed");
-                    dismiss();
-                  });
+                  util
+                    .map(crashDumps, (dump) =>
+                      fs
+                        .removeAsync(dump)
+                        .catch(() => undefined)
+                        .then(() => fs.removeAsync(dump + ".log"))
+                        .catch(() => undefined),
+                    )
+                    .then(() => {
+                      log("info", "crash dumps dismissed");
+                      dismiss();
+                    });
                 },
               },
             ];

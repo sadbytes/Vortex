@@ -1,7 +1,6 @@
 import * as path from "path";
 
 import { fs, log, util } from "@nexusmods/vortex-api";
-import Promise from "bluebird";
 
 import { IModEntry } from "../types/moEntries";
 

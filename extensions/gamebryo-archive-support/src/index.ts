@@ -2,7 +2,6 @@ import * as path from "path";
 import { PassThrough } from "stream";
 
 import { fs, types, util } from "@nexusmods/vortex-api";
-import PromiseBB from "bluebird";
 
 import { BA2Archive, loadBA2 } from "./ba2";
 import { BSAArchive, BSAWriter, createBSA, loadBSA } from "./bsa";
@@ -15,8 +14,8 @@ class BA2Handler implements types.IArchiveHandler {
     this.mBA2 = ba2;
   }
 
-  public readDir(archPath: string): PromiseBB<string[]> {
-    return new PromiseBB<string[]>((resolve) => {
+  public readDir(archPath: string): Promise<string[]> {
+    return new Promise<string[]>((resolve) => {
       let query = archPath.toLowerCase().replace(/\//g, "\\");
       if (!query.endsWith("\\")) {
         query = query + "\\";
@@ -38,12 +37,12 @@ class BA2Handler implements types.IArchiveHandler {
     });
   }
 
-  public extractFile(filePath: string, outputPath: string): PromiseBB<void> {
+  public extractFile(filePath: string, outputPath: string): Promise<void> {
     throw new util.NotSupportedError();
   }
 
-  public extractAll(outputPath: string): PromiseBB<void> {
-    return PromiseBB.resolve(this.mBA2.extractAll(outputPath));
+  public extractAll(outputPath: string): Promise<void> {
+    return Promise.resolve(this.mBA2.extractAll(outputPath));
   }
 
   public readFile(filePath: string): NodeJS.ReadableStream {
@@ -67,31 +66,31 @@ class BSAHandler implements types.IArchiveHandler {
     }
   }
 
-  public readDir(archPath: string): PromiseBB<string[]> {
+  public readDir(archPath: string): Promise<string[]> {
     if (this.mBSA === undefined) {
-      return PromiseBB.resolve([]);
+      return Promise.resolve([]);
     }
-    return PromiseBB.resolve(this.readDirImpl(archPath.split(path.sep)));
+    return Promise.resolve(this.readDirImpl(archPath.split(path.sep)));
   }
 
-  public extractFile(filePath: string, outputPath: string): PromiseBB<void> {
+  public extractFile(filePath: string, outputPath: string): Promise<void> {
     if (this.mBSA === undefined) {
-      return PromiseBB.reject(new Error("Archive opened in create mode"));
+      return Promise.reject(new Error("Archive opened in create mode"));
     }
     const file = this.mBSA.fileList.find(
       (f) => f.fullPath.toLowerCase() === filePath.toLowerCase().replace(/\//g, "\\"),
     );
     if (!file) {
-      return PromiseBB.reject(new Error("file not found " + filePath));
+      return Promise.reject(new Error("file not found " + filePath));
     }
-    return PromiseBB.resolve(this.mBSA.extractFile(file, outputPath));
+    return Promise.resolve(this.mBSA.extractFile(file, outputPath));
   }
 
-  public extractAll(outputPath: string): PromiseBB<void> {
+  public extractAll(outputPath: string): Promise<void> {
     if (this.mBSA === undefined) {
-      return PromiseBB.reject(new Error("Archive opened in create mode"));
+      return Promise.reject(new Error("Archive opened in create mode"));
     }
-    return PromiseBB.resolve(this.mBSA.extractAll(outputPath));
+    return Promise.resolve(this.mBSA.extractAll(outputPath));
   }
 
   public readFile(filePath: string): NodeJS.ReadableStream {
@@ -133,23 +132,23 @@ class BSAHandler implements types.IArchiveHandler {
     return pass;
   }
 
-  public addFile(filePath: string, sourcePath: string): PromiseBB<void> {
+  public addFile(filePath: string, sourcePath: string): Promise<void> {
     if (this.mWriter === undefined) {
-      return PromiseBB.reject(new Error("Archive not opened in create mode"));
+      return Promise.reject(new Error("Archive not opened in create mode"));
     }
     this.mWriter.addFile(filePath.replace(/\//g, "\\"), sourcePath);
-    return PromiseBB.resolve();
+    return Promise.resolve();
   }
 
-  public write(): PromiseBB<void> {
+  public write(): Promise<void> {
     if (this.mWriter === undefined) {
-      return PromiseBB.reject(new Error("Archive not opened in create mode"));
+      return Promise.reject(new Error("Archive not opened in create mode"));
     }
-    return PromiseBB.resolve(this.mWriter.write());
+    return Promise.resolve(this.mWriter.write());
   }
 
-  public closeArchive(): PromiseBB<void> {
-    return PromiseBB.resolve();
+  public closeArchive(): Promise<void> {
+    return Promise.resolve();
   }
 
   private readDirImpl(archPath: string[]): string[] {
@@ -183,14 +182,14 @@ class BSAHandler implements types.IArchiveHandler {
 function createBA2Handler(
   fileName: string,
   options: types.IArchiveOptions,
-): PromiseBB<types.IArchiveHandler> {
-  return PromiseBB.resolve(loadBA2(fileName).then((archive) => new BA2Handler(archive)));
+): Promise<types.IArchiveHandler> {
+  return Promise.resolve(loadBA2(fileName).then((archive) => new BA2Handler(archive)));
 }
 
 function createBSAHandler(
   fileName: string,
   options: types.IArchiveOptions,
-): PromiseBB<types.IArchiveHandler> {
+): Promise<types.IArchiveHandler> {
   if (options.create) {
     const version =
       options.version === "0x67" || options.version === "103"
@@ -199,9 +198,9 @@ function createBSAHandler(
           ? 0x69
           : 0x68;
     const writer = new BSAWriter(fileName, version as 0x67 | 0x68 | 0x69);
-    return PromiseBB.resolve(new BSAHandler(writer));
+    return Promise.resolve(new BSAHandler(writer));
   }
-  return PromiseBB.resolve(
+  return Promise.resolve(
     loadBSA(fileName, options.verify === true).then((archive) => new BSAHandler(archive)),
   );
 }

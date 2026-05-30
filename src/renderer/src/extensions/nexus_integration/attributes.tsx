@@ -59,7 +59,7 @@ function NexusId(props: INexusIdProps) {
   }, []);
 
   const checkForUpdate = React.useCallback(() => {
-    checkModVersion(api.store, nexus(), fileGameId, mod).catch((err) => {
+    checkModVersion(api.store, nexus(), fileGameId, mod).catch((err: any) => {
       if (err.statusCode === 403) {
         return queryResetSource(api, fileGameId, mod);
       } else {

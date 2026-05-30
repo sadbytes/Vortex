@@ -4,7 +4,6 @@ import { pathToFileURL } from "url";
 import * as nexusApi from "@nexusmods/nexus-api";
 import { IRevision } from "@nexusmods/nexus-api";
 import { actions, log, OptionsFilter, selectors, types, util } from "@nexusmods/vortex-api";
-import Bluebird from "bluebird";
 import * as _ from "lodash";
 import memoize from "memoize-one";
 import * as React from "react";
@@ -117,17 +116,17 @@ function makeDidRemoveMods() {
 function makeOnUnfulfilledRules(api: types.IExtensionApi) {
   const reported = new Set<string>();
 
-  return (profileId: string, modId: string, rules: types.IModRule[]): Bluebird<boolean> => {
+  return (profileId: string, modId: string, rules: types.IModRule[]): Promise<boolean> => {
     const state: types.IState = api.store.getState();
 
     const profile = selectors.profileById(state, profileId);
     const gameId = profile.gameId;
     if (gameId !== selectors.activeGameId(state)) {
-      return Bluebird.resolve(false);
+      return Promise.resolve(false);
     }
 
     if (modsBeingRemoved.has(makeModKey(gameId, modId))) {
-      return Bluebird.resolve(false);
+      return Promise.resolve(false);
     }
 
     const collection: types.IMod = util.getSafe(state.persistent.mods, [gameId, modId], undefined);
@@ -185,9 +184,9 @@ function makeOnUnfulfilledRules(api: types.IExtensionApi) {
         message: util.renderModName(collection),
         actions: notiActions,
       });
-      return Bluebird.resolve(true);
+      return Promise.resolve(true);
     } else {
-      return Bluebird.resolve(false);
+      return Promise.resolve(false);
     }
   };
 }
@@ -529,7 +528,7 @@ async function removeCollection(
 
 function genAttributeExtractor(api: types.IExtensionApi) {
   // tslint:disable-next-line:no-shadowed-variable
-  return (modInfo: any, modPath: string): Bluebird<{ [key: string]: any }> => {
+  return (modInfo: any, modPath: string): Promise<{ [key: string]: any }> => {
     const collectionId = modInfo.download?.modInfo?.nexus?.ids?.collectionId;
     const revisionId = modInfo.download?.modInfo?.nexus?.ids?.revisionId;
     const collectionSlug = modInfo.download?.modInfo?.nexus?.ids?.collectionSlug;
@@ -544,7 +543,7 @@ function genAttributeExtractor(api: types.IExtensionApi) {
       referenceTag,
     };
 
-    return Bluebird.resolve(result);
+    return Promise.resolve(result);
   };
 }
 
@@ -810,7 +809,7 @@ function register(context: types.IExtensionContext, collectionsCB: ICallbackMap)
     200,
     () => true,
     () => undefined,
-    () => Bluebird.resolve(false),
+    () => Promise.resolve(false),
     {
       name: "Collection",
       customDependencyManagement: true,

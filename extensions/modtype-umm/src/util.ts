@@ -1,13 +1,12 @@
 import path from "path";
 
 import { actions, fs, selectors, types, util } from "@nexusmods/vortex-api";
-import Bluebird from "bluebird";
 
 import { UMM_EXE, UMM_ID } from "./common";
 import { IUMMGameConfig } from "./types";
 
-export function toBlue<T>(func: (...args: any[]) => Promise<T>): (...args: any[]) => Bluebird<T> {
-  return (...args: any[]) => Bluebird.resolve(func(...args));
+export function toBlue<T>(func: (...args: any[]) => Promise<T>): (...args: any[]) => Promise<T> {
+  return (...args: any[]) => Promise.resolve(func(...args));
 }
 
 export function isUMMExecPred(filePath: string): boolean {

@@ -149,7 +149,7 @@ class Settings extends ComponentEx<IProps, {}> {
                   );
                 }
               })
-              .catch((err) => {
+              .catch((err: any) => {
                 if (err.code === "ENOENT") {
                   onShowError(
                     "Failed to fix NXM handling in Chrome",

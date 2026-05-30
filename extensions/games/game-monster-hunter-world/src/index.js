@@ -1,4 +1,3 @@
-const Promise = require("bluebird");
 const path = require("path");
 const winapi = require("winapi-bindings");
 const { actions, fs, util } = require("@nexusmods/vortex-api");
@@ -111,10 +110,11 @@ function prepareForModding(discovery, api) {
   return fs
     .ensureDirWritableAsync(path.join(discovery.path, NATIVE_PC_FOLDER), () => Promise.resolve())
     .then(() =>
-      Promise.each(STRACKER_FILES, (file) => {
-        const assemblyPath = path.join(discovery.path, file);
-        return fs.statAsync(assemblyPath);
-      })
+      util
+        .each(STRACKER_FILES, (file) => {
+          const assemblyPath = path.join(discovery.path, file);
+          return fs.statAsync(assemblyPath);
+        })
         .then(() => Promise.resolve())
         .catch((err) => (err.code === "ENOENT" ? raiseNotif() : Promise.reject(err))),
     );

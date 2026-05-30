@@ -1,5 +1,3 @@
-import type PromiseBB from "bluebird";
-
 import type { IModType } from "../extensions/gamemode_management/types/IModType";
 import type { IQueryArgEntry } from "../util/GameStoreHelper";
 import type { IDiscoveryResult, IMod } from "./IState";
@@ -76,7 +74,7 @@ export interface IGame extends ITool {
    *
    * Do not implement this in your game extension, the function is added by vortex itself
    */
-  getInstalledVersion?: (discovery: IDiscoveryResult) => PromiseBB<string>;
+  getInstalledVersion?: (discovery: IDiscoveryResult) => Promise<string>;
 
   /**
    * Determine whether the game needs to be executed via a launcher, like Steam or EpicGamesLauncher
@@ -105,7 +103,7 @@ export interface IGame extends ITool {
   requiresLauncher?: (
     gamePath: string,
     store?: string,
-  ) => PromiseBB<{ launcher: string; addInfo?: any }>;
+  ) => Promise<{ launcher: string; addInfo?: any }>;
 
   /**
    * returns the mod type extensions applicable to this game (all
@@ -166,7 +164,7 @@ export interface IGame extends ITool {
    * (like creating a directory, changing a registry key, ...) do it here. It will be called
    * every time before the game mode is activated.
    */
-  setup?: (discovery: IDiscoveryResult) => PromiseBB<void>;
+  setup?: (discovery: IDiscoveryResult) => Promise<void>;
 
   /**
    * additional details about the game that may be used by extensions. Some extensions may work
@@ -240,5 +238,5 @@ export interface IGame extends ITool {
    * Once the promise resolves the mods as enabled at that time will be deployed, so for example
    * if the user enabled a mod while this promise is pending, that mod will be deployed.
    */
-  deploymentGate?: () => PromiseBB<void>;
+  deploymentGate?: () => Promise<void>;
 }

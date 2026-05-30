@@ -1,5 +1,3 @@
-import Promise from "bluebird";
-
 export type ProblemSeverity = "warning" | "error";
 
 export interface ITestResult {

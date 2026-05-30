@@ -16,7 +16,6 @@
     "@types/react-router": "catalog:",
     "@types/redux": "catalog:",
     "@types/redux-thunk": "catalog:",
-    "bluebird": "catalog:",
     "copyfiles": "catalog:",
     "i18next": "catalog:",
     "iconv-lite": "catalog:",

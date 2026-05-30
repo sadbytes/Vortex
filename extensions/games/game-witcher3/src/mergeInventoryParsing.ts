@@ -2,7 +2,6 @@ import path from "path";
 
 import { fs, log, types, util } from "@nexusmods/vortex-api";
 /* eslint-disable */
-import Bluebird from "bluebird";
 import { parseStringPromise } from "xml2js";
 
 import { GAME_ID, SCRIPT_MERGER_ID, MERGE_INV_MANIFEST } from "./common";
@@ -14,7 +13,7 @@ function getMergeInventory(api: types.IExtensionApi) {
   const discovery = util.getSafe(state, ["settings", "gameMode", "discovered", GAME_ID], undefined);
   const scriptMerger = util.getSafe(discovery, ["tools", SCRIPT_MERGER_ID], undefined);
   if (scriptMerger === undefined || scriptMerger.path === undefined) {
-    return Bluebird.resolve([]);
+    return Promise.resolve([]);
   }
 
   return fs
@@ -88,7 +87,7 @@ export function getMergedModNames(api: types.IExtensionApi) {
     });
 }
 
-export function getNamesOfMergedMods(api: types.IExtensionApi): Bluebird<string[]> {
+export function getNamesOfMergedMods(api: types.IExtensionApi): Promise<string[]> {
   // This retrieves a unique list of mod names included in the merged mod
   return getMergeInventory(api).then(async (mergeInventory) => {
     if (mergeInventory === undefined) {

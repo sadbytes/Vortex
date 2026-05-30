@@ -836,7 +836,7 @@ export function onRemoveMods(
                 game: gameId,
                 mod: mod.id,
               });
-              await fs.removeAsync(fullModPath).catch((err) => {
+              await fs.removeAsync(fullModPath).catch((err: any) => {
                 if (err.code !== "ENOENT") {
                   throw err;
                 }
@@ -930,7 +930,7 @@ export function onAddMod(
     .then(() => {
       callback(null);
     })
-    .catch((err) => {
+    .catch((err: any) => {
       callback(err);
     });
 }

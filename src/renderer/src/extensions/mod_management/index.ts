@@ -1733,7 +1733,7 @@ function checkPendingTransfer(api: IExtensionApi): Promise<ITestResult> {
             api.store.dispatch(setTransferMods(gameMode, undefined));
             fixResolve();
           })
-          .catch((err) => {
+          .catch((err: any) => {
             if (err.code === "ENOENT") {
               // Destination is already gone, that's fine.
               api.store.dispatch(setTransferMods(gameMode, undefined));

@@ -1,8 +1,6 @@
 import * as path from "path";
 
 import { types, util } from "@nexusmods/vortex-api";
-import Promise from "bluebird";
-
 function testSupported(files: string[]): Promise<types.ISupportedResult> {
   const supported =
     files.find((filePath) => path.basename(filePath).toLowerCase() === "enbseries.ini") !==

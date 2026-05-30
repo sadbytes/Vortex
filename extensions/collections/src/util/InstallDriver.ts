@@ -3,7 +3,6 @@ import * as path from "path";
 /* eslint-disable */
 import * as nexusApi from "@nexusmods/nexus-api";
 import { actions, log, selectors, types, util } from "@nexusmods/vortex-api";
-import Bluebird from "bluebird";
 import * as _ from "lodash";
 
 import * as installActions from "../actions/installTracking";
@@ -46,7 +45,7 @@ class InstallDriver {
   private mInfoCache: InfoCache;
   private mTotalSize: number;
   private mOnStop: () => void;
-  private mPrepare: Bluebird<void> = Bluebird.resolve();
+  private mPrepare: Promise<void> = Promise.resolve();
   private mTimeStarted: number;
   private mPostprocessing: boolean = false;
 
@@ -56,7 +55,7 @@ class InstallDriver {
       const actions = this.mStateUpdates.slice();
       this.mStateUpdates = [];
       util.batchDispatch(this.mApi.store, actions);
-      return Bluebird.resolve();
+      return Promise.resolve();
     },
     100,
     false,
@@ -72,7 +71,7 @@ class InstallDriver {
       if (this.mProfile && this.mGameId && this.mCollection) {
         this.updateProgress(this.mProfile, this.mGameId, this.mCollection);
       }
-      return Bluebird.resolve();
+      return Promise.resolve();
     },
     1000,
     false,
@@ -179,7 +178,7 @@ class InstallDriver {
       if (download !== undefined) {
         this.mInstallingMod = download.localPath;
       }
-      return Bluebird.resolve();
+      return Promise.resolve();
     });
 
     api.events.on("did-install-mod", (gameId: string, archiveId: string, modId: string) => {
@@ -441,13 +440,13 @@ class InstallDriver {
     );
   }
 
-  public async prepare(func: () => Bluebird<void>) {
+  public async prepare(func: () => Promise<void>) {
     this.mPrepare = this.mPrepare.then(func);
   }
 
   public async query(profile: types.IProfile, collection: types.IMod) {
     await this.mPrepare;
-    this.mPrepare = Bluebird.resolve();
+    this.mPrepare = Promise.resolve();
 
     if (collection?.archiveId === undefined) {
       return;
@@ -470,7 +469,7 @@ class InstallDriver {
 
   public async start(profile: types.IProfile, collection: types.IMod) {
     await this.mPrepare;
-    this.mPrepare = Bluebird.resolve();
+    this.mPrepare = Promise.resolve();
 
     if (collection?.archiveId === undefined) {
       return;
@@ -878,7 +877,7 @@ class InstallDriver {
     this.mApi.ext.withSuppressedTests?.(
       ["plugins-changed", "settings-changed", "mod-activated", "mod-installed"],
       () =>
-        new Bluebird((resolve) => {
+        new Promise((resolve) => {
           this.mOnStop = () => {
             resolve(undefined);
             this.mOnStop = undefined;

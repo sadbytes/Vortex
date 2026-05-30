@@ -1,7 +1,6 @@
 import * as path from "path";
 
 import { log, types, util } from "@nexusmods/vortex-api";
-import Promise from "bluebird";
 import * as _ from "lodash";
 import * as Redux from "redux";
 import * as semver from "semver";

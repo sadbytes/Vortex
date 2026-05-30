@@ -2,16 +2,14 @@ import path from "path";
 
 import TOML from "@iarna/toml";
 import { fs, selectors, types, util } from "@nexusmods/vortex-api";
-/* eslint-disable */
-import Bluebird from "bluebird";
 
+/* eslint-disable */
 import { BEPINEX_CONFIG_FILE, getSupportMap } from "./common";
 import { IBepInExGameConfig } from "./types";
 
-// We _should_ just export this from vortex-api, but I guess it's not wise to make it
-//  easy for users since we want to move away from bluebird in the future ?
-export function toBlue<T>(func: (...args: any[]) => Promise<T>): (...args: any[]) => Bluebird<T> {
-  return (...args: any[]) => Bluebird.resolve(func(...args));
+// Keep this local to avoid expanding the public extension API surface.
+export function toBlue<T>(func: (...args: any[]) => Promise<T>): (...args: any[]) => Promise<T> {
+  return (...args: any[]) => Promise.resolve(func(...args));
 }
 
 export async function createDirectories(api: types.IExtensionApi, config: IBepInExGameConfig) {

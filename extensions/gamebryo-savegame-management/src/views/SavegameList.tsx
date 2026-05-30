@@ -12,7 +12,6 @@ import {
   types,
   util,
 } from "@nexusmods/vortex-api";
-import Bluebird from "bluebird";
 import * as React from "react";
 import { Alert, FormControl, Panel } from "react-bootstrap";
 import { withTranslation } from "react-i18next";
@@ -56,7 +55,7 @@ interface IActionProps {
     title: string,
     content: types.IDialogContent,
     actions: types.DialogActions,
-  ) => Bluebird<types.IDialogResult>;
+  ) => Promise<types.IDialogResult>;
   onShowError: (message: string, details: any, id?: string, allowReport?: boolean) => void;
 }
 

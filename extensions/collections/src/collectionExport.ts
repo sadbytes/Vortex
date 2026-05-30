@@ -2,7 +2,6 @@ import * as path from "path";
 
 import { ICreateCollectionResult, IGraphErrorDetail } from "@nexusmods/nexus-api";
 import { actions, fs, log, selectors, types, util } from "@nexusmods/vortex-api";
-import Bluebird from "bluebird";
 import * as _ from "lodash";
 import Zip from "node-7z";
 import { dir as tmpDir } from "tmp";
@@ -67,7 +66,7 @@ async function writeCollectionToFile(
   mod: types.IMod,
   outputPath: string,
 ) {
-  await fs.ensureDirWritableAsync(outputPath, () => Bluebird.resolve());
+  await fs.ensureDirWritableAsync(outputPath, () => Promise.resolve());
 
   await fs.writeFileAsync(
     path.join(outputPath, "collection.json"),

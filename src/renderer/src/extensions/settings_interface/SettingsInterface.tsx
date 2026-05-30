@@ -1,7 +1,6 @@
 import * as path from "path";
 
 import type { IParameters } from "@vortex/shared/cli";
-import PromiseBB from "bluebird";
 import * as React from "react";
 import { Alert, Button, ControlLabel, FormControl, FormGroup, HelpBlock } from "react-bootstrap";
 import { useSelector } from "react-redux";
@@ -87,7 +86,7 @@ interface IActionProps {
     title: string,
     content: IDialogContent,
     actions: DialogActions,
-  ) => PromiseBB<IDialogResult>;
+  ) => Promise<IDialogResult>;
   onSetCustomTitlebar: (enable: boolean) => void;
   onSetDesktopNotifications: (enabled: boolean) => void;
   onSetHideTopLevelCategory: (hide: boolean) => void;
@@ -343,12 +342,16 @@ class SettingsInterfaceImpl extends ComponentEx<IProps, {}> {
     }
     const ext: { modId?: number } = extensions.find((iter) => iter.name === extName) || {};
     const { value } = target;
-    const dlProm: PromiseBB<boolean[]> =
+    const dlProm: Promise<boolean[]> =
       ext.modId !== undefined
         ? this.context.api
             .emitAndAwait("install-extension", ext)
-            .tap((success) => (success ? this.props.onReloadLanguages() : PromiseBB.resolve()))
-        : PromiseBB.resolve([true]);
+            .then((success) =>
+              Promise.resolve(success ? this.props.onReloadLanguages() : Promise.resolve()).then(
+                () => success,
+              ),
+            )
+        : Promise.resolve([true]);
     dlProm.then((success: boolean[]) => {
       if (success.indexOf(false) === -1) {
         this.props.onSetLanguage(value);
@@ -567,7 +570,7 @@ function isValidLanguageCode(langId: string) {
   }
 }
 
-function readLocales(extensions: IAvailableExtension[]): PromiseBB<ILanguage[]> {
+function readLocales(extensions: IAvailableExtension[]): Promise<ILanguage[]> {
   const bundledLanguages = getVortexPath("locales");
   const userLanguages = path.normalize(path.join(getVortexPath("userData"), "locales"));
 
@@ -575,14 +578,15 @@ function readLocales(extensions: IAvailableExtension[]): PromiseBB<ILanguage[]> 
 
   let local: string[] = [];
 
-  return PromiseBB.join(
-    readExtensibleDir("translation", bundledLanguages, userLanguages)
-      .map((file: string) => path.basename(file))
-      .tap((files) => (local = files)),
+  return Promise.all([
+    readExtensibleDir("translation", bundledLanguages, userLanguages).then((files: string[]) => {
+      local = files.map((file: string) => path.basename(file));
+      return local;
+    }),
     translationExts.map((ext) => ext.language),
-  )
-    .then((fileLists) => Array.from(new Set([].concat(...fileLists))))
-    .filter((langId: string) => isValidLanguageCode(langId))
+  ])
+    .then((fileLists) => Array.from(new Set<string>([].concat(...fileLists))))
+    .then((langIds) => langIds.filter((langId: string) => isValidLanguageCode(langId)))
     .then((files) => {
       // files contains just the unique languages being supported, but there
       // may be multiple extensions providing the same language

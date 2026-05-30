@@ -2,7 +2,6 @@ import { mkdir, readdir, rename, rmdir, stat } from "node:fs/promises";
 import * as path from "path";
 
 import { getErrorCode } from "@vortex/shared";
-import PromiseBB from "bluebird";
 import type * as Redux from "redux";
 import * as semver from "semver";
 import format from "string-template";
@@ -28,24 +27,24 @@ import { convertGameIdReverse } from "../extensions/nexus_integration/util/conve
 import { activeGameId } from "../extensions/profile_management/selectors";
 import { log } from "../logging";
 import type { IState } from "../types/IState";
+import { each, map } from "./asyncpromise";
 import { UserCanceled } from "./CustomErrors";
 import * as fs from "./fs";
 import makeCI from "./makeCaseInsensitive";
 import { batchDispatch } from "./util";
-
 interface IMigration {
   id: string;
   minVersion: string;
   maySkip: boolean;
   doQuery: boolean;
   description: string;
-  apply: (store: Redux.Store<IState>) => PromiseBB<void> | Promise<void>;
+  apply: (store: Redux.Store<IState>) => Promise<void> | Promise<void>;
 }
 
-function selectDirectory(defaultPathPattern: string): PromiseBB<string> {
+function selectDirectory(defaultPathPattern: string): Promise<string> {
   const defaultPath = getDownloadPath(defaultPathPattern, undefined);
   return fs
-    .ensureDirWritableAsync(defaultPath, () => PromiseBB.resolve())
+    .ensureDirWritableAsync(defaultPath, () => Promise.resolve())
     .then(() =>
       window.api.dialog.showOpen({
         title: "Select empty directory to store downloads",
@@ -56,15 +55,15 @@ function selectDirectory(defaultPathPattern: string): PromiseBB<string> {
     .then((result) => {
       const { filePaths } = result;
       if (filePaths === undefined || filePaths.length === 0) {
-        return PromiseBB.reject(new UserCanceled());
+        return Promise.reject(new UserCanceled());
       }
       return fs
         .readdirAsync(filePaths[0])
         .catch((err) => {
           const code = getErrorCode(err);
           return code === "ENOENT"
-            ? fs.ensureDirWritableAsync(filePaths[0], () => PromiseBB.resolve()).then(() => [])
-            : PromiseBB.reject(err);
+            ? fs.ensureDirWritableAsync(filePaths[0], () => Promise.resolve()).then(() => [])
+            : Promise.reject(err);
         })
         .then((files) => {
           if (files.length > 0) {
@@ -74,34 +73,33 @@ function selectDirectory(defaultPathPattern: string): PromiseBB<string> {
             );
             return selectDirectory(defaultPathPattern);
           } else {
-            return PromiseBB.resolve(filePaths[0]);
+            return Promise.resolve(filePaths[0]);
           }
         });
     });
 }
 
-function transferPath(from: string, to: string): PromiseBB<void> {
-  return PromiseBB.join(
-    fs.statAsync(from),
-    fs.statAsync(to),
-    (statOld: fs.Stats, statNew: fs.Stats) => PromiseBB.resolve(statOld.dev === statNew.dev),
-  )
+function transferPath(from: string, to: string): Promise<void> {
+  return Promise.all([fs.statAsync(from), fs.statAsync(to)])
+    .then(([statOld, statNew]: [fs.Stats, fs.Stats]) => statOld.dev === statNew.dev)
     .then((sameVolume: boolean) => {
       const func = sameVolume ? fs.renameAsync : fs.copyAsync;
-      return PromiseBB.resolve(fs.readdirAsync(from))
-        .map((fileName: string) =>
-          func(path.join(from, fileName), path.join(to, fileName)).catch((err) =>
-            getErrorCode(err) === "EXDEV"
-              ? // EXDEV implies we tried to rename when source and destination are
-                // not in fact on the same volume. This is what comparing the stat.dev
-                // was supposed to prevent.
-                fs.copyAsync(path.join(from, fileName), path.join(to, fileName))
-              : PromiseBB.reject(err),
+      return Promise.resolve(fs.readdirAsync(from))
+        .then((fileNames: string[]) =>
+          map(fileNames, (fileName: string) =>
+            func(path.join(from, fileName), path.join(to, fileName)).catch((err) =>
+              getErrorCode(err) === "EXDEV"
+                ? // EXDEV implies we tried to rename when source and destination are
+                  // not in fact on the same volume. This is what comparing the stat.dev
+                  // was supposed to prevent.
+                  fs.copyAsync(path.join(from, fileName), path.join(to, fileName))
+                : Promise.reject(err),
+            ),
           ),
         )
         .then(() => fs.removeAsync(from));
     })
-    .catch((err) => (getErrorCode(err) === "ENOENT" ? PromiseBB.resolve() : PromiseBB.reject(err)));
+    .catch((err) => (getErrorCode(err) === "ENOENT" ? Promise.resolve() : Promise.reject(err)));
 }
 
 function dialogProm(
@@ -109,8 +107,8 @@ function dialogProm(
   title: string,
   message: string,
   options: string[],
-): PromiseBB<string> {
-  return PromiseBB.resolve(
+): Promise<string> {
+  return Promise.resolve(
     window.api.dialog.showMessageBox({
       type: type as "none" | "info" | "error" | "question" | "warning",
       buttons: options,
@@ -121,7 +119,7 @@ function dialogProm(
   ).then((result) => options[result.response]);
 }
 
-function forceLogoutForOauth_1_9(store: Redux.Store<IState>): PromiseBB<void> {
+function forceLogoutForOauth_1_9(store: Redux.Store<IState>): Promise<void> {
   const state = store.getState();
 
   const apiKey = state.confidential.account?.["nexus"]?.["APIKey"];
@@ -138,7 +136,7 @@ function forceLogoutForOauth_1_9(store: Redux.Store<IState>): PromiseBB<void> {
   // we only care about forcing re-authing if they are logged in already
   if (!loggedIn) {
     log("warn", "forceLogoutForOauth_1_9() not logged in so skipping migration");
-    return PromiseBB.resolve();
+    return Promise.resolve();
   }
 
   // this is going to force a logout and set the ForceLogout flag in the state so that the nexus_integration extension can pick up the change
@@ -149,10 +147,10 @@ function forceLogoutForOauth_1_9(store: Redux.Store<IState>): PromiseBB<void> {
 
   log("info", "forceLogoutForOauth_1_9() should be logged out");
 
-  return PromiseBB.resolve();
+  return Promise.resolve();
 }
 
-function moveDownloads_0_16(store: Redux.Store<IState>): PromiseBB<void> {
+function moveDownloads_0_16(store: Redux.Store<IState>): Promise<void> {
   const state = store.getState();
   log("info", "importing downloads from pre-0.16.0 version");
   return dialogProm(
@@ -165,7 +163,7 @@ function moveDownloads_0_16(store: Redux.Store<IState>): PromiseBB<void> {
     .then(() => selectDirectory(state.settings.downloads.path))
     .then((downloadPath) => {
       store.dispatch(setDownloadPath(downloadPath));
-      return PromiseBB.map(Object.keys(state.settings.gameMode.discovered), (gameId) => {
+      return map(Object.keys(state.settings.gameMode.discovered), (gameId) => {
         const resolvedPath = path.join(downloadPath, gameId);
         return fs
           .ensureDirAsync(resolvedPath)
@@ -179,10 +177,10 @@ function moveDownloads_0_16(store: Redux.Store<IState>): PromiseBB<void> {
     });
 }
 
-function updateInstallPath_0_16(store: Redux.Store<IState>): PromiseBB<void> {
+function updateInstallPath_0_16(store: Redux.Store<IState>): Promise<void> {
   const state = store.getState();
   const { paths } = state.settings.mods as any;
-  return PromiseBB.map(Object.keys(paths || {}), (gameId) => {
+  return map(Object.keys(paths || {}), (gameId) => {
     const base = resolvePath("base", paths, gameId);
     log(
       "info",
@@ -202,13 +200,13 @@ function updateInstallPath_0_16(store: Redux.Store<IState>): PromiseBB<void> {
         ),
       ),
     );
-    return PromiseBB.resolve();
+    return Promise.resolve();
   }).then(() => {});
 }
 
-function enableModernLayout_2_0(store: Redux.Store<IState>): PromiseBB<void> {
+function enableModernLayout_2_0(store: Redux.Store<IState>): Promise<void> {
   batchDispatch(store, [setUseModernLayout(true), setProfilesVisible(true)]);
-  return PromiseBB.resolve();
+  return Promise.resolve();
 }
 
 async function moveDomainFile(src: string, dest: string): Promise<boolean> {
@@ -409,11 +407,11 @@ const migrations: IMigration[] = [
   },
 ];
 
-function queryMigration(migration: IMigration): PromiseBB<boolean> {
+function queryMigration(migration: IMigration): Promise<boolean> {
   if (!migration.doQuery) {
-    return PromiseBB.resolve(true);
+    return Promise.resolve(true);
   }
-  return new PromiseBB((resolve, reject) => {
+  return new Promise((resolve, reject) => {
     const buttons = migration.maySkip ? ["Cancel", "Skip", "Continue"] : ["Cancel", "Continue"];
     void window.api.dialog
       .showMessageBox({
@@ -432,17 +430,17 @@ function queryMigration(migration: IMigration): PromiseBB<boolean> {
   });
 }
 
-function queryContinue(err: Error): PromiseBB<void> {
+function queryContinue(err: Error): Promise<void> {
   return dialogProm(
     "error",
     "Migration failed",
     "A migration step failed. You should quit now and resolve the cause of the issue.\n" +
       err.stack || err.message,
     ["Ignore", "Quit"],
-  ).then((selection) => (selection === "Ignore" ? PromiseBB.resolve() : PromiseBB.reject(err)));
+  ).then((selection) => (selection === "Ignore" ? Promise.resolve() : Promise.reject(err)));
 }
 
-function migrate(store: Redux.Store<IState>, oldVersion?: string): PromiseBB<void> {
+function migrate(store: Redux.Store<IState>, oldVersion?: string): Promise<void> {
   const state = store.getState();
   // Callers should pass the *prior* persisted appVersion: in v2.x renderer
   // startup, `state.app.appVersion` is overwritten with the current version
@@ -454,12 +452,12 @@ function migrate(store: Redux.Store<IState>, oldVersion?: string): PromiseBB<voi
   const neccessaryMigrations = migrations
     .filter((mig) => semver.lt(effectiveOldVersion, mig.minVersion))
     .filter((mig) => alreadyApplied.indexOf(mig.id) === -1);
-  return PromiseBB.each(neccessaryMigrations, (migration) =>
+  return each(neccessaryMigrations, (migration) =>
     queryMigration(migration)
-      .then((proceed: boolean) => (proceed ? migration.apply(store) : PromiseBB.resolve()))
+      .then((proceed: boolean) => (proceed ? migration.apply(store) : Promise.resolve()))
       .then(() => {
         store.dispatch(completeMigration(migration.id));
-        return PromiseBB.resolve();
+        return Promise.resolve();
       })
       .catch((err: Error) => {
         if (err instanceof UserCanceled) {

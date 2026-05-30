@@ -2,7 +2,6 @@ import path from "path";
 
 /* eslint-disable */
 import { actions, fs, log, selectors, types, util } from "@nexusmods/vortex-api";
-import Bluebird from "bluebird";
 import * as semver from "semver";
 import { LockedState } from "vortex-api/lib/extensions/file_based_loadorder/types/types";
 import { IOpenOptions, ISaveOptions } from "vortex-api/lib/types/IExtensionContext";
@@ -42,7 +41,7 @@ export async function serialize(
   logDebug("serialize loadOrder=", loadOrder);
 
   // Write the prefixed LO to file.
-  await fs.removeAsync(loFilePath).catch({ code: "ENOENT" }, () => Promise.resolve());
+  await fs.removeAsync(loFilePath).catch(util.only({ code: "ENOENT" }, () => Promise.resolve()));
   await fs.writeFileAsync(loFilePath, JSON.stringify(loadOrder), { encoding: "utf8" });
 
   // check the state for if we are keeping the game one in sync
@@ -96,7 +95,9 @@ export async function deserialize(context: types.IExtensionContext): Promise<typ
             {
               label: "Regenerate File",
               action: async () => {
-                await fs.removeAsync(loFilePath).catch({ code: "ENOENT" }, () => Promise.resolve());
+                await fs
+                  .removeAsync(loFilePath)
+                  .catch(util.only({ code: "ENOENT" }, () => Promise.resolve()));
                 loadOrder = [];
                 return resolve();
               },
@@ -768,7 +769,7 @@ async function readPAKs(api: types.IExtensionApi): Promise<Array<ICacheEntry>> {
             return undefined;
           }
         };
-        return Bluebird.resolve(func());
+        return Promise.resolve(func());
       });
     }),
   );

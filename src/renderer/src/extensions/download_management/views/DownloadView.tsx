@@ -1,7 +1,6 @@
 import * as path from "path";
 
 import { DownloadIsHTML } from "@vortex/shared/errors";
-import type PromiseBB from "bluebird";
 import type { TFunction } from "i18next";
 import _ from "lodash";
 import * as React from "react";
@@ -83,7 +82,7 @@ interface IActionProps {
     title: string,
     content: IDialogContent,
     actions: DialogActions,
-  ) => PromiseBB<IDialogResult>;
+  ) => Promise<IDialogResult>;
   onShowError: (
     message: string,
     details?: string | Error,
@@ -703,7 +702,7 @@ class DownloadView extends ComponentEx<IDownloadViewProps, IComponentState> {
         return;
       }
 
-      opn(path.join(downloadPathForGame(internalGameId), download.localPath)).catch((err) => {
+      opn(path.join(downloadPathForGame(internalGameId), download.localPath)).catch((err: any) => {
         this.props.onShowError("Failed to open archive", err, undefined, false);
       });
     }

@@ -2,7 +2,6 @@ import path from "path";
 
 import { actions, fs, log, selectors, types, util } from "@nexusmods/vortex-api";
 /* eslint-disable */
-import Bluebird from "bluebird";
 import winapi from "winapi-bindings";
 
 import { genCollectionsData, parseCollectionsData } from "./collections/collections";
@@ -92,7 +91,7 @@ const tools: types.ITool[] = [
   },
 ];
 
-function findGame(): Bluebird<string> {
+function findGame(): Promise<string> {
   try {
     const instPath = winapi.RegGetValue(
       "HKEY_LOCAL_MACHINE",
@@ -102,7 +101,7 @@ function findGame(): Bluebird<string> {
     if (!instPath) {
       throw new Error("empty registry key");
     }
-    return Bluebird.resolve(instPath.value as string);
+    return Promise.resolve(instPath.value as string);
   } catch (err) {
     return util.GameStoreHelper.findByAppId([
       GOG_ID_GOTY,
@@ -223,7 +222,7 @@ function main(context: types.IExtensionContext) {
     25,
     isTW3(context.api),
     getTLPath(context.api),
-    () => Bluebird.resolve(false),
+    () => Promise.resolve(false),
     { deploymentEssential: false, name: "Mod Limit Patcher Mod Type" },
   );
   context.registerModType(
@@ -231,7 +230,7 @@ function main(context: types.IExtensionContext) {
     60,
     isTW3(context.api),
     getDocumentsPath,
-    () => Bluebird.resolve(false),
+    () => Promise.resolve(false),
   );
 
   context.registerMerge(
@@ -296,9 +295,9 @@ function main(context: types.IExtensionContext) {
   };
   context.registerLoadOrder(new TW3LoadOrder(props));
   // context.registerTest('tw3-mod-limit-breach', 'gamemode-activated',
-  //   () => Bluebird.resolve(testModLimitBreach(context.api, modLimitPatcher)));
+  //   () => Promise.resolve(testModLimitBreach(context.api, modLimitPatcher)));
   // context.registerTest('tw3-mod-limit-breach', 'mod-activated',
-  //   () => Bluebird.resolve(testModLimitBreach(context.api, modLimitPatcher)));
+  //   () => Promise.resolve(testModLimitBreach(context.api, modLimitPatcher)));
 
   context.once(() => {
     priorityManager = new PriorityManager(context.api, "prefix-based");

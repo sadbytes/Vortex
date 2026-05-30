@@ -29,7 +29,6 @@
  */
 
 import { getErrorMessageOrDefault } from "@vortex/shared";
-import PromiseBB from "bluebird";
 import * as _ from "lodash";
 
 import type { DialogActions } from "../../actions/notifications";
@@ -42,12 +41,12 @@ import type {
 import type { INotificationAction } from "../../types/INotification";
 import type { ITestResult } from "../../types/ITestResult";
 import { getApplication } from "../../util/application";
+import { map } from "../../util/asyncpromise";
 import { ProcessCanceled, UserCanceled } from "../../util/CustomErrors";
 import { log } from "../../util/log";
 import { activeGameId, activeProfile } from "../../util/selectors";
 import { getSafe } from "../../util/storeHelper";
 import { setdefault } from "../../util/util";
-
 interface ICheckEntry {
   id: string;
   check: CheckFunction;
@@ -61,7 +60,7 @@ const fixTriggered: { [id: string]: boolean } = {};
 
 function applyFix(api: IExtensionApi, check: ICheckEntry, result: ITestResult) {
   if (fixTriggered[check.id]) {
-    return PromiseBB.resolve();
+    return Promise.resolve();
   }
   fixTriggered[check.id] = true;
   return Promise.resolve(result.automaticFix())
@@ -152,7 +151,7 @@ function runCheck(api: IExtensionApi, check: ICheckEntry): Promise<void> {
               title: "Check again",
               action: () => {
                 const preCheck =
-                  result.onRecheck !== undefined ? result.onRecheck() : PromiseBB.resolve();
+                  result.onRecheck !== undefined ? result.onRecheck() : Promise.resolve();
                 return preCheck.then(() => runCheck(api, check));
               },
             });
@@ -196,13 +195,13 @@ function runChecks(api: IExtensionApi, event: string, delay?: number) {
   triggerDelays[event] = setTimeout(() => {
     const eventChecks = getSafe(checks, [event], []);
     log("debug", "running checks", { event, count: eventChecks.length });
-    PromiseBB.map(eventChecks, (par: ICheckEntry) => runCheck(api, par)).then(() => {
+    map(eventChecks, (par: ICheckEntry) => runCheck(api, par)).then(() => {
       log("debug", "all checks completed", { event });
     });
   }, delay || 500);
 }
 
-function withSuppressedTests(tests: string[], cb: () => PromiseBB<void>) {
+function withSuppressedTests(tests: string[], cb: () => Promise<void>) {
   tests.forEach((test) => {
     setdefault(suppressedTests, test, 0);
     suppressedTests[test] += 1;

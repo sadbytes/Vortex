@@ -1,7 +1,6 @@
 import * as path from "path";
 
-import { fs } from "@nexusmods/vortex-api";
-import Promise from "bluebird";
+import { fs, util } from "@nexusmods/vortex-api";
 
 /**
  * find all files in a directory that match a certain name filter and are newer
@@ -22,7 +21,7 @@ function filesNewer(
     .then((files: string[]) => {
       // stat all files that match the name filter
       const matches = files.filter(nameFilter);
-      return Promise.map(matches, (file) =>
+      return util.map(matches, (file) =>
         fs.statAsync(path.join(searchPath, file)).then((stats: fs.Stats) =>
           Promise.resolve({
             name: file,

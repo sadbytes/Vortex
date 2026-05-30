@@ -14,7 +14,6 @@ import {
   types,
   util,
 } from "@nexusmods/vortex-api";
-import Promise from "bluebird";
 import * as React from "react";
 import {
   Alert,
@@ -844,7 +843,7 @@ class ImportDialog extends ComponentEx<IProps, IComponentState> {
     const archiveIds = Object.keys(downloads).filter(
       (key) => modEntries.find((mod) => mod.modFilename === downloads[key].localPath) !== undefined,
     );
-    return Promise.each(archiveIds, (archiveId) => {
+    return util.each(archiveIds, (archiveId) => {
       this.context.api.events.emit("start-install-download", archiveId, true);
     });
   }
@@ -962,7 +961,7 @@ class ImportDialog extends ComponentEx<IProps, IComponentState> {
         this.mTrace = new TraceImport();
       } catch (err) {
         if (err.code === "EEXIST") {
-          return Promise.delay(1000).then(() => startImportProcess());
+          return util.delay(1000).then(() => startImportProcess());
         } else {
           this.context.api.showErrorNotification(
             "Failed to initialize trace log for NMM import",

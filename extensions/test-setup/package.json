@@ -10,10 +10,8 @@
   "license": "GPL-3.0",
   "devDependencies": {
     "7z-bin": "catalog:",
-    "@types/bluebird": "catalog:",
     "@types/i18next": "catalog:",
     "@types/node": "catalog:",
-    "bluebird": "catalog:",
     "copyfiles": "catalog:",
     "i18next": "catalog:",
     "react-bootstrap": "catalog:",

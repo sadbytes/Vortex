@@ -1,4 +1,3 @@
-const Promise = require("bluebird");
 const winapi = require("winapi-bindings");
 
 const path = require("path");
@@ -154,9 +153,11 @@ function filterResourceCfg(filePath) {
         })
         .join("\n");
     })
-    .catch({ code: "ENOENT" }, (err) => {
-      return defaultResources;
-    });
+    .catch(
+      util.only({ code: "ENOENT" }, (err) => {
+        return defaultResources;
+      }),
+    );
 }
 
 /**

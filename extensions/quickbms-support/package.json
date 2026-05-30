@@ -14,11 +14,9 @@
     "extensionName": "QuickBMS Support"
   },
   "devDependencies": {
-    "@types/bluebird": "catalog:",
     "@types/i18next": "catalog:",
     "@types/react": "catalog:",
     "@types/redux": "catalog:",
-    "bluebird": "catalog:",
     "copyfiles": "catalog:",
     "cross-fetch": "catalog:",
     "i18next": "catalog:",

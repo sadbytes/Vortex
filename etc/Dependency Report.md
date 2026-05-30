@@ -25,11 +25,9 @@ This is a list of all modules leaked by Vortex to extensions. Any module listed 
 | @opentelemetry/sdk-trace-base | 1.30.1 |
 | @opentelemetry/semantic-conventions | 1.40.0 |
 | @tailwindcss/cli | 4.3.0 |
-| @types/bluebird | 3.5.20 |
 | @types/uuid | 3.4.13 |
 | bbcode-to-react | 0.2.11 |
 | big.js | 5.2.2 |
-| bluebird | 3.7.2 |
 | bootstrap-sass | 3.4.3 |
 | classnames | 2.5.1 |
 | commander | 4.1.1 |

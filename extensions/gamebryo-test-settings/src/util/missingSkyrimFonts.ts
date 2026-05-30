@@ -1,7 +1,6 @@
 import * as path from "path";
 
 import { fs, types, util } from "@nexusmods/vortex-api";
-import Promise from "bluebird";
 
 function missingSkyrimFonts(
   state: types.IState,
@@ -37,7 +36,7 @@ function missingSkyrimFonts(
 
         // test the remaining files for existence
         // TODO: I guess we should also check in bsas, right?
-        return Promise.map(removedFonts, (font: string) => {
+        return util.map(removedFonts, (font: string) => {
           const fontFile: string = path.join(modPath, font);
           return fs
             .statAsync(fontFile)

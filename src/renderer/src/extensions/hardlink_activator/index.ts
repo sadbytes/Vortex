@@ -2,7 +2,6 @@ import * as path from "path";
 import * as util from "util";
 
 import { getErrorCode, getErrorMessageOrDefault, unknownToError } from "@vortex/shared";
-import PromiseBB from "bluebird";
 import type { TFunction } from "i18next";
 import turbowalk from "turbowalk";
 
@@ -11,6 +10,7 @@ import { log } from "../../logging";
 import type { IExtensionApi, IExtensionContext } from "../../types/IExtensionContext";
 import type { IGame } from "../../types/IGame";
 import type { IState } from "../../types/IState";
+import { delay, map } from "../../util/asyncpromise";
 import * as fs from "../../util/fs";
 import * as winapi from "../../util/nativeModules/winapiBindings";
 import { installPathForGame } from "../../util/selectors";
@@ -22,7 +22,6 @@ import type {
   IDeploymentMethod,
   IUnavailableReason,
 } from "../mod_management/types/IDeploymentMethod";
-
 export class FileFound extends Error {
   constructor(name: string) {
     super(name);
@@ -134,7 +133,7 @@ class DeploymentMethod extends LinkingDeployment {
             );
           },
           fixCallback: (api: IExtensionApi) =>
-            new PromiseBB((_resolve, _reject) => {
+            new Promise((_resolve, _reject) => {
               api.events.emit("show-main-page", "application_settings");
               api.store.dispatch(setSettingsPage("Mods"));
               api.highlightControl(
@@ -187,7 +186,7 @@ class DeploymentMethod extends LinkingDeployment {
       // cleanup failed, this is almost certainly due to an AV jumping in to check these new files,
       // I mean, why would I be able to create the files but not delete them?
       // just try again later - can't do that synchronously though
-      PromiseBB.delay(100)
+      delay(100)
         .then(() => fs.removeAsync(canary + ".link"))
         .then(() => fs.removeAsync(canary))
         .catch((err) => {
@@ -212,24 +211,24 @@ class DeploymentMethod extends LinkingDeployment {
     return super.finalize(gameId, dataPath, installationPath, progressCB);
   }
 
-  public postPurge(): PromiseBB<void> {
+  public postPurge(): Promise<void> {
     delete this.mInstallationFiles;
     this.mInstallationFiles = undefined;
-    return PromiseBB.resolve();
+    return Promise.resolve();
   }
 
   protected purgeLinks(
     installationPath: string,
     dataPath: string,
     onProgress?: (num: number, total: number) => void,
-  ): PromiseBB<void> {
-    let installEntryProm: PromiseBB<Set<string>>;
+  ): Promise<void> {
+    let installEntryProm: Promise<Set<string>>;
 
     // find ids of all files in our mods directory
     // using idStr (string) instead of id (number) to avoid precision loss
     // for NTFS file IDs exceeding Number.MAX_SAFE_INTEGER
     if (this.mInstallationFiles !== undefined) {
-      installEntryProm = PromiseBB.resolve(this.mInstallationFiles);
+      installEntryProm = Promise.resolve(this.mInstallationFiles);
     } else {
       this.mInstallationFiles = new Set<string>();
       installEntryProm = turbowalk(
@@ -251,10 +250,10 @@ class DeploymentMethod extends LinkingDeployment {
           skipHidden: false,
         },
       )
-        .catch((err) =>
-          ["ENOENT", "ENOTFOUND"].includes(err.code) ? PromiseBB.resolve() : PromiseBB.reject(err),
+        .catch((err: any) =>
+          ["ENOENT", "ENOTFOUND"].includes(err.code) ? Promise.resolve() : Promise.reject(err),
         )
-        .then(() => PromiseBB.resolve(this.mInstallationFiles));
+        .then(() => Promise.resolve(this.mInstallationFiles));
     }
 
     // now remove all files in the game directory that have the same id
@@ -263,15 +262,15 @@ class DeploymentMethod extends LinkingDeployment {
       const total = inos.size;
       let purged: number = 0;
 
-      let queue = PromiseBB.resolve();
+      let queue = Promise.resolve();
       if (inos.size === 0) {
-        return PromiseBB.resolve();
+        return Promise.resolve();
       }
       return turbowalk(
         dataPath,
         (entries) => {
           queue = queue.then(() =>
-            PromiseBB.map(entries, (entry) => {
+            map(entries, (entry) => {
               if (entry.linkCount > 1 && entry.idStr !== undefined && inos.has(entry.idStr)) {
                 ++purged;
                 if (purged % 1000 === 0) {
@@ -281,7 +280,7 @@ class DeploymentMethod extends LinkingDeployment {
                   .unlinkAsync(entry.filePath)
                   .catch((err) => log("warn", "failed to remove", entry.filePath));
               } else {
-                return PromiseBB.resolve();
+                return Promise.resolve();
               }
             }).then(() => undefined),
           );
@@ -301,7 +300,7 @@ class DeploymentMethod extends LinkingDeployment {
       );
   }
 
-  protected unlinkFile(linkPath: string): PromiseBB<void> {
+  protected unlinkFile(linkPath: string): Promise<void> {
     return fs.unlinkAsync(linkPath);
   }
 
@@ -310,22 +309,22 @@ class DeploymentMethod extends LinkingDeployment {
     sourcePath: string,
     linkStatsIn: fs.Stats,
     sourceStatsIn: fs.Stats,
-  ): PromiseBB<boolean> {
+  ): Promise<boolean> {
     if (linkStatsIn !== undefined && sourceStatsIn !== undefined) {
-      return PromiseBB.resolve(linkStatsIn.nlink > 1 && linkStatsIn.ino === sourceStatsIn.ino);
+      return Promise.resolve(linkStatsIn.nlink > 1 && linkStatsIn.ino === sourceStatsIn.ino);
     }
 
     return fs
       .lstatAsync(linkPath)
       .then((linkStats) =>
         linkStats.nlink === 1
-          ? PromiseBB.resolve(false)
+          ? Promise.resolve(false)
           : fs.lstatAsync(sourcePath).then((sourceStats) => linkStats.ino === sourceStats.ino),
       )
       .catch((err) =>
         getErrorCode(err) === "ENOENT"
-          ? PromiseBB.resolve(false)
-          : PromiseBB.reject(unknownToError(err)),
+          ? Promise.resolve(false)
+          : Promise.reject(unknownToError(err)),
       );
   }
 

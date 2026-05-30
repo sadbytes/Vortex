@@ -1,6 +1,5 @@
 import * as fs from "fs";
 
-import PromiseBB from "bluebird";
 import * as tmp from "tmp";
 
 import { getRealNodeModulePaths } from "./webpack-hacks";
@@ -85,8 +84,8 @@ export function runThreaded(
   func: (...args: any[]) => any,
   moduleBase: string,
   ...args: any[]
-): PromiseBB<any> {
-  return new PromiseBB((resolve, reject) => {
+): Promise<any> {
+  return new Promise((resolve, reject) => {
     tmp.file({ postfix: ".js" }, (err: any, tmpPath: string, fd: number, cleanup: () => void) => {
       if (err) {
         return reject(err);

@@ -1,7 +1,6 @@
 import path from "path";
 
 import { fs, log, selectors, types, util } from "@nexusmods/vortex-api";
-import Bluebird from "bluebird";
 
 import { GAME_ID, MOD_FILE_EXT, modsRelPath } from "./common";
 import { deserialize, serialize, validate } from "./loadOrder";
@@ -166,7 +165,7 @@ const EXECUTABLE = path.join("CodeVein", "Binaries", "Win64", "CodeVein-Win64-Sh
 
 function getGameVersion(gamePath: string) {
   const exeVersion = require("exe-version");
-  return Bluebird.resolve(exeVersion.getProductVersionLocalized(path.join(gamePath, EXECUTABLE)));
+  return Promise.resolve(exeVersion.getProductVersionLocalized(path.join(gamePath, EXECUTABLE)));
 }
 
 function main(context: types.IExtensionContext) {

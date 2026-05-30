@@ -1,7 +1,6 @@
 import * as path from "path";
 
-import { actions, fs, selectors, types } from "@nexusmods/vortex-api";
-import Promise from "bluebird";
+import { actions, fs, selectors, types, util } from "@nexusmods/vortex-api";
 import * as I18next from "i18next";
 import { genHash } from "modmeta-db";
 import * as Redux from "redux";
@@ -42,84 +41,97 @@ function importMods(
       trace.log("info", "transfer unpacked mods files");
       const installPath = selectors.installPath(store.getState());
       const downloadPath = selectors.downloadPath(store.getState());
-      return Promise.mapSeries(mods, (mod, idx, len) => {
-        trace.log("info", "transferring", mod);
-        progress(mod.modName, idx / len);
-        const archivePath =
-          mod.archiveName === undefined || path.isAbsolute(mod.archiveName)
-            ? mod.archiveName
-            : path.join(moConfig.downloadPath, mod.archiveName);
-        return transferUnpackedMod(mod, path.join(moConfig.modPath, mod.modName), installPath, true)
-          .then(() =>
-            mod.archiveName === undefined || mod.archiveName === ""
-              ? Promise.resolve("")
-              : genHash(archivePath)
-                  .then((hash) => hash.md5sum)
-                  .catch((err) => ""),
+      return util
+        .mapSeries(mods, (mod, idx, len) => {
+          trace.log("info", "transferring", mod);
+          progress(mod.modName, idx / len);
+          const archivePath =
+            mod.archiveName === undefined || path.isAbsolute(mod.archiveName)
+              ? mod.archiveName
+              : path.join(moConfig.downloadPath, mod.archiveName);
+          return transferUnpackedMod(
+            mod,
+            path.join(moConfig.modPath, mod.modName),
+            installPath,
+            true,
           )
-          .then((md5Hash) => {
-            const archiveId = shortid();
-            store.dispatch(actions.addMod(gameId, toVortexMod(mod, md5Hash, archiveId)));
+            .then(() =>
+              mod.archiveName === undefined || mod.archiveName === ""
+                ? Promise.resolve("")
+                : genHash(archivePath)
+                    .then((hash) => hash.md5sum)
+                    .catch((err) => ""),
+            )
+            .then((md5Hash) => {
+              const archiveId = shortid();
+              store.dispatch(actions.addMod(gameId, toVortexMod(mod, md5Hash, archiveId)));
 
-            if (importArchives && !!mod.archiveName) {
-              trace.log("info", "transferring archive", archivePath);
-              progress(mod.modName + " (" + t("Archive") + ")", idx / len);
-              return fs
-                .statAsync(archivePath)
-                .then((stats) => {
-                  store.dispatch(
-                    actions.addLocalDownload(
-                      archiveId,
-                      gameId,
-                      path.basename(archivePath),
-                      stats.size,
-                    ),
-                  );
-                  return transferArchive(archivePath, downloadPath, true);
-                })
-                .tap(() => {
-                  // Attempt to set metadata information for the newly added archive.
-                  if (mod.nexusId !== "0") {
-                    store.dispatch(actions.setDownloadModInfo(archiveId, "source", "nexus"));
+              if (importArchives && !!mod.archiveName) {
+                trace.log("info", "transferring archive", archivePath);
+                progress(mod.modName + " (" + t("Archive") + ")", idx / len);
+                return fs
+                  .statAsync(archivePath)
+                  .then((stats) => {
                     store.dispatch(
-                      actions.setDownloadModInfo(
+                      actions.addLocalDownload(
                         archiveId,
-                        "nexus.ids.modId",
-                        parseInt(mod.nexusId, 10),
+                        gameId,
+                        path.basename(archivePath),
+                        stats.size,
                       ),
                     );
-                    store.dispatch(
-                      actions.setDownloadModInfo(archiveId, "nexus.ids.gameId", gameId),
-                    );
+                    return transferArchive(archivePath, downloadPath, true);
+                  })
+                  .then((__v) =>
+                    Promise.resolve(
+                      (() => {
+                        // Attempt to set metadata information for the newly added archive.
+                        if (mod.nexusId !== "0") {
+                          store.dispatch(actions.setDownloadModInfo(archiveId, "source", "nexus"));
+                          store.dispatch(
+                            actions.setDownloadModInfo(
+                              archiveId,
+                              "nexus.ids.modId",
+                              parseInt(mod.nexusId, 10),
+                            ),
+                          );
+                          store.dispatch(
+                            actions.setDownloadModInfo(archiveId, "nexus.ids.gameId", gameId),
+                          );
 
-                    if (!!mod.modVersion) {
-                      store.dispatch(
-                        actions.setDownloadModInfo(archiveId, "version", mod.modVersion),
-                      );
+                          if (!!mod.modVersion) {
+                            store.dispatch(
+                              actions.setDownloadModInfo(archiveId, "version", mod.modVersion),
+                            );
+                          }
+                          store.dispatch(actions.setDownloadModInfo(archiveId, "game", gameId));
+                          store.dispatch(
+                            actions.setDownloadModInfo(archiveId, "name", mod.modName),
+                          );
+                        }
+                      })(),
+                    ).then(() => __v),
+                  )
+                  .catch((err) => {
+                    if (err.code === "ENOENT") {
+                      trace.log("info", "archive doesn't exist");
+                      return Promise.resolve();
+                    } else {
+                      return Promise.reject(err);
                     }
-                    store.dispatch(actions.setDownloadModInfo(archiveId, "game", gameId));
-                    store.dispatch(actions.setDownloadModInfo(archiveId, "name", mod.modName));
-                  }
-                })
-                .catch((err) => {
-                  if (err.code === "ENOENT") {
-                    trace.log("info", "archive doesn't exist");
-                    return Promise.resolve();
-                  } else {
-                    return Promise.reject(err);
-                  }
-                });
-            } else {
-              return Promise.resolve();
-            }
-          })
-          .catch((err) => {
-            trace.log("error", "Failed to import", err);
-            errors.push(mod.modName);
-          });
-      }).then(() => {
-        trace.log("info", "Finished transferring unpacked mod files");
-      });
+                  });
+              } else {
+                return Promise.resolve();
+              }
+            })
+            .catch((err) => {
+              trace.log("error", "Failed to import", err);
+              errors.push(mod.modName);
+            });
+        })
+        .then(() => {
+          trace.log("info", "Finished transferring unpacked mod files");
+        });
     })
     .then(() => {
       trace.finish();

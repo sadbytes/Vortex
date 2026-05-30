@@ -85,9 +85,9 @@ export default defineConfig([
 
       // Vortex custom rules
       "vortex/no-bluebird-promise-alias": "error",
-      "vortex/no-bluebird-resolve-promiselike": "warn", // TODO: change to error
+      "vortex/no-bluebird-resolve-promiselike": "error",
       "vortex/no-restricted-imports-warnings": [
-        "warn",
+        "error",
         {
           restrictions: [
             {

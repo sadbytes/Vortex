@@ -1,7 +1,6 @@
 import * as path from "path";
 
 import { fs, log, selectors, types, util } from "@nexusmods/vortex-api";
-import Bluebird from "bluebird";
 import turbowalk, { IEntry } from "turbowalk";
 
 import { NAMESPACE } from "./globals";
@@ -395,7 +394,7 @@ async function doPreRemoveModCheck(api: types.IExtensionApi, gameId: string, mod
 function makeOnWillRemoveMods(api: types.IExtensionApi) {
   const debouncer = new util.Debouncer(
     (gameId: string, modIds: string[]) => {
-      return Bluebird.resolve(doPreRemoveModCheck(api, gameId, modIds));
+      return Promise.resolve(doPreRemoveModCheck(api, gameId, modIds));
     },
     2000,
     true,

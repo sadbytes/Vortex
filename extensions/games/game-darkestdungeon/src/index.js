@@ -1,4 +1,3 @@
-const Promise = require("bluebird");
 const path = require("path");
 const winapi = require("winapi-bindings");
 const { parseStringPromise } = require("xml2js");
@@ -63,30 +62,32 @@ function walkAsync(dir, gamePathIndex) {
     gamePathIndex = dir.length + 1;
   }
   return fs.readdirAsync(dir).then((files) => {
-    return Promise.map(files, (file) => {
-      const fullPath = path.join(dir, file);
-      return fs
-        .statAsync(fullPath)
-        .then((stats) => {
-          if (stats.isDirectory()) {
-            _DIRECTORY_STRUCT.push(fullPath.substr(gamePathIndex));
-            return walkAsync(fullPath, gamePathIndex).then((dirs) => {
-              _DIRECTORY_STRUCT.concat(dirs);
+    return util
+      .map(files, (file) => {
+        const fullPath = path.join(dir, file);
+        return fs
+          .statAsync(fullPath)
+          .then((stats) => {
+            if (stats.isDirectory()) {
+              _DIRECTORY_STRUCT.push(fullPath.substr(gamePathIndex));
+              return walkAsync(fullPath, gamePathIndex).then((dirs) => {
+                _DIRECTORY_STRUCT.concat(dirs);
+                return Promise.resolve();
+              });
+            } else {
               return Promise.resolve();
-            });
-          } else {
+            }
+          })
+          .catch((err) => {
+            // The point of this function is to map out the game's
+            //  directory structure - any errors raised during mapping
+            //  simply signfies an unavailable path and therefore
+            //  shouldn't block the rest of the process (log instead)
+            log("warn", "[DD] unable to add file to dir struct", err);
             return Promise.resolve();
-          }
-        })
-        .catch((err) => {
-          // The point of this function is to map out the game's
-          //  directory structure - any errors raised during mapping
-          //  simply signfies an unavailable path and therefore
-          //  shouldn't block the rest of the process (log instead)
-          log("warn", "[DD] unable to add file to dir struct", err);
-          return Promise.resolve();
-        });
-    }).then(() => Promise.resolve(_DIRECTORY_STRUCT));
+          });
+      })
+      .then(() => Promise.resolve(_DIRECTORY_STRUCT));
   });
 }
 

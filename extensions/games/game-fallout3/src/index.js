@@ -1,4 +1,3 @@
-const Promise = require("bluebird");
 const path = require("path");
 const { fs, util, log } = require("@nexusmods/vortex-api");
 const STEAMAPP_ID = "22300";

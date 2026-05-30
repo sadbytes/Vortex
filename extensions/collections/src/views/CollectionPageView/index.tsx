@@ -19,7 +19,6 @@ import {
   types,
   util,
 } from "@nexusmods/vortex-api";
-import Bluebird from "bluebird";
 import type { TFunction } from "i18next";
 import * as _ from "lodash";
 import memoizeOne from "memoize-one";
@@ -993,7 +992,7 @@ class CollectionPage extends ComponentEx<IProps, IComponentState> {
         return (
           removeMods
             ? util.removeMods(this.context.api, profile.gameId, wereInstalled)
-            : Bluebird.resolve()
+            : Promise.resolve()
         )
           .then(() => {
             if (removeArchive) {
@@ -1003,7 +1002,7 @@ class CollectionPage extends ComponentEx<IProps, IComponentState> {
                 });
               });
             }
-            return Bluebird.resolve();
+            return Promise.resolve();
           })
           .then(() => {
             if (removeRule) {
@@ -1013,15 +1012,17 @@ class CollectionPage extends ComponentEx<IProps, IComponentState> {
             }
           });
       })
-      .catch(util.ProcessCanceled, (err) => {
-        this.context.api.sendNotification({
-          id: "cant-remove-mod",
-          type: "warning",
-          title: "Failed to remove mods",
-          message: err.message,
-        });
-      })
-      .catch(util.UserCanceled, () => null)
+      .catch(
+        util.only(util.ProcessCanceled, (err) => {
+          this.context.api.sendNotification({
+            id: "cant-remove-mod",
+            type: "warning",
+            title: "Failed to remove mods",
+            message: err.message,
+          });
+        }),
+      )
+      .catch(util.only(util.UserCanceled, () => null))
       .catch((err) => {
         this.context.api.showErrorNotification("Failed to remove selected mods", err);
       });

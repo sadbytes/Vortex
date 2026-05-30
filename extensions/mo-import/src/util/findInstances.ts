@@ -1,7 +1,6 @@
 import * as path from "path";
 
-import { fs, types } from "@nexusmods/vortex-api";
-import Promise from "bluebird";
+import { fs, types, util } from "@nexusmods/vortex-api";
 
 import parseMOIni from "./parseMOIni";
 
@@ -26,20 +25,24 @@ function findInstances(
   const base = instancesPath();
   return fs
     .readdirAsync(base)
-    .filter((fileName: string) =>
-      fs
-        .statAsync(path.join(base, fileName))
-        .then((stat) => stat.isDirectory())
-        .catch((err) =>
-          ["EACCES", "EPERM"].indexOf(err.code) !== -1
-            ? Promise.resolve(false)
-            : Promise.reject(err),
-        ),
+    .then((__arr) =>
+      util.filter(__arr, (fileName: string) =>
+        fs
+          .statAsync(path.join(base, fileName))
+          .then((stat) => stat.isDirectory())
+          .catch((err) =>
+            ["EACCES", "EPERM"].indexOf(err.code) !== -1
+              ? Promise.resolve(false)
+              : Promise.reject(err),
+          ),
+      ),
     )
-    .filter((dirName: string) =>
-      parseMOIni(games, path.join(base, dirName))
-        .then((moConfig) => moConfig.game === convertGameId(gameId))
-        .catch((err) => false),
+    .then((__a) =>
+      util.filter(__a, (dirName: string) =>
+        parseMOIni(games, path.join(base, dirName))
+          .then((moConfig) => moConfig.game === convertGameId(gameId))
+          .catch((err) => false),
+      ),
     )
     .then((instances: string[]) => instances)
     .catch((err) => {

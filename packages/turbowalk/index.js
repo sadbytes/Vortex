@@ -1,6 +1,5 @@
 const path = require("path");
 
-const Bluebird = require("bluebird");
 const fg = require("fast-glob");
 
 /**
@@ -34,7 +33,7 @@ function turbowalk(basePath, progress, options = {}) {
     skipInaccessible = true,
   } = options;
 
-  return new Bluebird((resolve, reject) => {
+  return new Promise((resolve, reject) => {
     let buffer = [];
     const dirPaths = [];
     let failed = false;

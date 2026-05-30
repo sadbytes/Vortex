@@ -1,4 +1,3 @@
-const Promise = require("bluebird");
 const path = require("path");
 const semver = require("semver");
 
@@ -108,13 +107,13 @@ function migrate020(api, oldVersion) {
       return Promise.resolve({ modTypes, deployedModTypes });
     })
     .then((res) =>
-      Promise.each(res.deployedModTypes, (modType) =>
+      util.each(res.deployedModTypes, (modType) =>
         api.emitAndAwait("purge-mods-in-path", GAME_ID, modType, res.modTypes[modType]),
       ),
     )
     .then(() => {
       const officialMods = modKeys.filter((key) => isOfficialModType(mods[key].type));
-      return Promise.each(officialMods, (mod) =>
+      return util.each(officialMods, (mod) =>
         migrateMod020(api, mods[mod]).catch((err) => {
           log("error", "failed to migrate BaS mod", err.message);
           failedToMigrate.push(mod);
@@ -201,23 +200,32 @@ function migrateMod020(api, mod) {
           }));
         let newDirs = [];
         let newFiles = [];
-        return Promise.each(directories, (dir) =>
-          fs.ensureDirWritableAsync(dir.dest).tap(() => newDirs.push(dir.dest)),
-        )
+        return util
+          .each(directories, (dir) =>
+            fs
+              .ensureDirWritableAsync(dir.dest)
+              .then((__v) => Promise.resolve((() => newDirs.push(dir.dest))(__v)).then(() => __v)),
+          )
           .then(() =>
-            Promise.each(files, (file) =>
-              fs.linkAsync(file.src, file.dest).tap(() => newFiles.push(file.dest)),
+            util.each(files, (file) =>
+              fs
+                .linkAsync(file.src, file.dest)
+                .then((__v) =>
+                  Promise.resolve((() => newFiles.push(file.dest))(__v)).then(() => __v),
+                ),
             ),
           )
           .catch((err) => {
             // migration failed, cleanup all newly created dirs and files
             const dirs = newDirs.sort((a, b) => b.length - a.length);
-            return Promise.each([...newFiles, ...dirs], (entry) =>
-              fs.removeAsync(entry).catch(() => Promise.resolve()),
-            ).then(() => Promise.reject(err));
+            return util
+              .each([...newFiles, ...dirs], (entry) =>
+                fs.removeAsync(entry).catch(() => Promise.resolve()),
+              )
+              .then(() => Promise.reject(err));
           })
-          .then(() => Promise.each(files, (file) => fs.removeAsync(file.src)))
-          .then(() => Promise.each(directories, (dir) => fs.removeAsync(dir.src)));
+          .then(() => util.each(files, (file) => fs.removeAsync(file.src)))
+          .then(() => util.each(directories, (dir) => fs.removeAsync(dir.src)));
       });
     });
 }

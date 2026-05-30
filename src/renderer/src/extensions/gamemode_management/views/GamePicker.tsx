@@ -1,5 +1,4 @@
 import type { IGameListEntry } from "@nexusmods/nexus-api";
-import type PromiseBB from "bluebird";
 import { ratio } from "fuzzball";
 import update from "immutability-helper";
 import memoizeOne from "memoize-one";
@@ -54,8 +53,8 @@ function byGameName(lhs: IGameStored, rhs: IGameStored): number {
 }
 
 interface IBaseProps {
-  onRefreshGameInfo: (gameId: string) => PromiseBB<void>;
-  onBrowseGameLocation: (gameId: string) => PromiseBB<void>;
+  onRefreshGameInfo: (gameId: string) => Promise<void>;
+  onBrowseGameLocation: (gameId: string) => Promise<void>;
   nexusGames: IGameListEntry[];
 }
 

@@ -1,7 +1,6 @@
 import * as path from "path";
 
 import { actions, fs, selectors, types, util } from "@nexusmods/vortex-api";
-import Bluebird from "bluebird";
 import IniParser, { WinapiFormat } from "vortex-parse-ini";
 
 import { REDIRECTION_FILE, REDIRECTION_MOD } from "./constants";
@@ -14,7 +13,7 @@ import {
   isSupported,
 } from "./util/gameSupport";
 
-function genIniTweaksIni(api: types.IExtensionApi): Bluebird<string> {
+function genIniTweaksIni(api: types.IExtensionApi): Promise<string> {
   const gameId = selectors.activeGameId(api.store.getState());
   const parser = new IniParser(new WinapiFormat() as any);
   const archivesKey = archiveListKey(gameId);
@@ -29,15 +28,15 @@ bUseArchives=1
 ${archivesKey}=${REDIRECTION_FILE}, ${archives}`;
   });
 
-  return Bluebird.resolve(nativePromise);
+  return Promise.resolve(nativePromise);
 }
 
-function enableBSARedirection(api: types.IExtensionApi): Bluebird<void> {
+function enableBSARedirection(api: types.IExtensionApi): Promise<void> {
   const store = api.store;
   const gameMode = selectors.activeGameId(store.getState());
 
   if (!isSupported(gameMode)) {
-    return Bluebird.resolve(undefined);
+    return Promise.resolve(undefined);
   }
 
   const gamePath: string = util.getSafe(
@@ -48,7 +47,7 @@ function enableBSARedirection(api: types.IExtensionApi): Bluebird<void> {
 
   if (gamePath === undefined) {
     // TODO: happened in testing, but how does one get here with no path configured?
-    return Bluebird.resolve(undefined);
+    return Promise.resolve(undefined);
   }
 
   const iniBaseName = path.basename(iniName(gameMode), ".ini");
@@ -75,14 +74,14 @@ function enableBSARedirection(api: types.IExtensionApi): Bluebird<void> {
       .then(() =>
         fs
           .writeFileAsync(dummyFile, "", { encoding: "utf8" })
-          .catch((err) => (err.code !== "EEXIST" ? Bluebird.reject(err) : Bluebird.resolve())),
+          .catch((err) => (err.code !== "EEXIST" ? Promise.reject(err) : Promise.resolve())),
       );
   const cleanupDummy = () =>
-    Bluebird.mapSeries([dummyFile, path.dirname(dummyFile)], (iter) =>
-      fs.removeAsync(iter).catch((err) => Bluebird.resolve()),
+    util.mapSeries([dummyFile, path.dirname(dummyFile)], (iter) =>
+      fs.removeAsync(iter).catch((err) => Promise.resolve()),
     );
 
-  return new Bluebird((resolve, reject) => {
+  return new Promise<void>((resolve, reject) => {
     api.events.emit("create-mod", gameMode, mod, (error) => {
       if (error !== null) {
         return reject(error);
@@ -122,28 +121,30 @@ function enableBSARedirection(api: types.IExtensionApi): Bluebird<void> {
       if (err["path"] === undefined) {
         err["path"] = invalidationPath;
       }
-      return Bluebird.reject(err);
+      return Promise.reject(err);
     });
 }
 
-export function toggleInvalidation(api: types.IExtensionApi, gameMode: string): Bluebird<void> {
+export function toggleInvalidation(api: types.IExtensionApi, gameMode: string): Promise<void> {
   const mods = util.getSafe(api.store.getState(), ["persistent", "mods", gameMode], {});
   if (mods[REDIRECTION_MOD] !== undefined) {
     api.events.emit("remove-mod", gameMode, REDIRECTION_MOD);
-    return Bluebird.resolve();
+    return Promise.resolve();
   } else {
     return enableBSARedirection(api)
-      .catch(util.NotSupportedError, (err) => {
-        api.showErrorNotification(
-          "Failed to add invalidation mod",
-          "The extension providing BSA support has been disabled or removed. " +
-            "Without it, Vortex can't provide BSA redirection.",
-          {
-            allowReport: false,
-          },
-        );
-        api.events.emit("remove-mod", gameMode, REDIRECTION_MOD);
-      })
+      .catch(
+        util.only(util.NotSupportedError, (err) => {
+          api.showErrorNotification(
+            "Failed to add invalidation mod",
+            "The extension providing BSA support has been disabled or removed. " +
+              "Without it, Vortex can't provide BSA redirection.",
+            {
+              allowReport: false,
+            },
+          );
+          api.events.emit("remove-mod", gameMode, REDIRECTION_MOD);
+        }),
+      )
       .catch((err) => {
         api.showErrorNotification("Failed to add invalidation mod", err);
         api.events.emit("remove-mod", gameMode, REDIRECTION_MOD);

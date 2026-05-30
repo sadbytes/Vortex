@@ -11,7 +11,6 @@
   "license": "GPL-3.0",
   "devDependencies": {
     "@nexusmods/nexus-api": "catalog:",
-    "@types/bluebird": "catalog:",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/react-bootstrap": "catalog:",

@@ -1,4 +1,3 @@
-const Promise = require("bluebird");
 const path = require("path");
 const { actions, fs, FlexLayout, log, selectors, util } = require("@nexusmods/vortex-api");
 const semver = require("semver");
@@ -123,7 +122,7 @@ async function getDeployedManaged(context, modType) {
   const gameManifestFiles = deploymentManifest.files.filter(
     (entry) => path.basename(entry.relPath).toLowerCase() === MOD_MANIFEST,
   );
-  return Promise.reduce(
+  return util.reduce(
     gameManifestFiles,
     async (accum, manifest) => {
       try {

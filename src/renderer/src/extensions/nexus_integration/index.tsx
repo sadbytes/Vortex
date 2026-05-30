@@ -15,7 +15,6 @@ import type NexusT from "@nexusmods/nexus-api";
 import { NexusError, RateLimitError, TimeoutError } from "@nexusmods/nexus-api";
 import { getErrorMessageOrDefault, unknownToError } from "@vortex/shared";
 import { DownloadIsHTML } from "@vortex/shared/errors";
-import PromiseBB from "bluebird";
 import * as fuzz from "fuzzball";
 import type { TFunction } from "i18next";
 import * as React from "react";
@@ -35,6 +34,7 @@ import type { IExtensionApi, IExtensionContext } from "../../types/IExtensionCon
 import type { IModLookupResult } from "../../types/IModLookupResult";
 import type { IState } from "../../types/IState";
 import { getApplication } from "../../util/application";
+import { only } from "../../util/asyncpromise";
 import {
   DataInvalid,
   HTTPError,
@@ -122,7 +122,6 @@ import GoPremiumDashlet from "./views/GoPremiumDashlet";
 import LoginDialog from "./views/LoginDialog";
 import LoginIcon from "./views/LoginIcon";
 import {} from "./views/Settings";
-
 let nexus: NexusT;
 let userInfoDebouncer: Debouncer;
 
@@ -208,10 +207,10 @@ class Disableable {
       return () => {
         const e = new ProcessCanceled(`network disconnected: ${prop}`);
         e.stack = cErr.stack;
-        return PromiseBB.reject(e);
+        return Promise.reject(e);
       };
     } else if (this.mDisabled) {
-      return () => PromiseBB.reject(new APIDisabled(prop));
+      return () => Promise.reject(new APIDisabled(prop));
     } else if (prop === "getFileByMD5") {
       return (hash: string, gameId?: string) => {
         if (gameId?.toLowerCase() === "skyrimse") {
@@ -242,10 +241,10 @@ class Disableable {
           // it's possible we never logged in successfully in the first place
           // because the internet was offline at startup.
           // In that case we can use this opportunity to try to log in now
-          const prom: PromiseBB<IValidateKeyResponse> =
+          const prom: Promise<IValidateKeyResponse> =
             key === undefined
-              ? PromiseBB.resolve(undefined as IValidateKeyResponse)
-              : PromiseBB.resolve(
+              ? Promise.resolve(undefined as IValidateKeyResponse)
+              : Promise.resolve(
                   truthy(obj.getValidationResult()) ? obj.revalidate() : obj.setKey(key),
                 );
 
@@ -329,7 +328,7 @@ const requestLog = {
               } else {
                 this.log(prop, args || [], caller);
               }
-              return PromiseBB.resolve(res);
+              return Promise.resolve(res);
             })
             .catch((err) => {
               if (typeof err === "string") {
@@ -346,7 +345,7 @@ const requestLog = {
                 stack
                   .map((frame) => `  at ${frame.getFunctionName()} (${framePos(frame)})`)
                   .join("\n");
-              return PromiseBB.reject(err);
+              return Promise.reject(err);
             });
         } else {
           return prom;
@@ -357,7 +356,7 @@ const requestLog = {
 };
 
 function retrieveCategories(api: IExtensionApi, isUpdate: boolean) {
-  let askUser: PromiseBB<boolean>;
+  let askUser: Promise<boolean>;
   if (isUpdate) {
     askUser = api.store
       .dispatch(
@@ -374,7 +373,7 @@ function retrieveCategories(api: IExtensionApi, isUpdate: boolean) {
         return result.action === "Retrieve";
       });
   } else {
-    askUser = PromiseBB.resolve(true);
+    askUser = Promise.resolve(true);
   }
 
   askUser.then((userContinue: boolean) => {
@@ -401,7 +400,7 @@ function retrieveCategories(api: IExtensionApi, isUpdate: boolean) {
             // for all we know there could be another extension providing categories for this game
             // so we can't really display an error message or anything
             log("debug", "game unknown on nexus", { gameId: nexusId });
-            return PromiseBB.reject(new ProcessCanceled("unsupported game"));
+            return Promise.reject(new ProcessCanceled("unsupported game"));
           }
           log("info", "retrieve categories for game", gameId);
           return retrieveCategoryList(nexusId, nexus);
@@ -409,14 +408,16 @@ function retrieveCategories(api: IExtensionApi, isUpdate: boolean) {
         .then((categories: ICategoryDictionary) => {
           api.events.emit("update-categories", gameId, categories, isUpdate);
         })
-        .catch(ProcessCanceled, () => null)
-        .catch(TimeoutError, () => {
-          api.sendNotification({
-            type: "warning",
-            message: "Timeout retrieving categories from server, please try again later.",
-          });
-        })
-        .catch((err) => {
+        .catch(only(ProcessCanceled, () => null))
+        .catch(
+          only(TimeoutError, () => {
+            api.sendNotification({
+              type: "warning",
+              message: "Timeout retrieving categories from server, please try again later.",
+            });
+          }),
+        )
+        .catch((err: any) => {
           if (["ESOCKETTIMEDOUT", "ETIMEDOUT"].includes(err.code)) {
             api.sendNotification({
               type: "warning",
@@ -521,7 +522,7 @@ function safeParseInt(input: any, radix: number = 10): number {
 const attributesCache: { [key: string]: { data: any; expires: number } } = {};
 const ATTRIBUTES_CACHE_DURATION = 10 * 60 * 1000; // 10 minutes
 
-function processAttributes(state: IState, input: any, quick: boolean): PromiseBB<any> {
+function processAttributes(state: IState, input: any, quick: boolean): Promise<any> {
   const nexusChangelog = input.nexus?.fileInfo?.changelog_html;
 
   const modName = decodeHTML(
@@ -535,7 +536,7 @@ function processAttributes(state: IState, input: any, quick: boolean): PromiseBB
   const fuzzRatio =
     modName !== undefined && fileName !== undefined ? fuzz.ratio(modName, fileName) : 100;
 
-  let fetchPromise: PromiseBB<IRemoteInfo> = PromiseBB.resolve(undefined);
+  let fetchPromise: Promise<IRemoteInfo> = Promise.resolve(undefined);
 
   let gameId = input.download?.modInfo?.game || input.download?.modInfo?.nexus?.ids?.gameId;
 
@@ -566,7 +567,7 @@ function processAttributes(state: IState, input: any, quick: boolean): PromiseBB
         // Check cache first
         const cached = attributesCache[cacheKey];
         if (cached && Date.now() < cached.expires) {
-          fetchPromise = PromiseBB.resolve(cached.data);
+          fetchPromise = Promise.resolve(cached.data);
         } else {
           const domain = nexusGameId(gameById(state, gameId), gameId);
 
@@ -582,7 +583,7 @@ function processAttributes(state: IState, input: any, quick: boolean): PromiseBB
               }
               return result;
             })
-            .catch((err) => {
+            .catch((err: any) => {
               log("error", "failed to fetch nexus info during mod install", {
                 gameId,
                 modId,
@@ -598,7 +599,7 @@ function processAttributes(state: IState, input: any, quick: boolean): PromiseBB
         // Check cache first
         const cached = attributesCache[cacheKey];
         if (cached && Date.now() < cached.expires) {
-          fetchPromise = PromiseBB.resolve(cached.data);
+          fetchPromise = Promise.resolve(cached.data);
         } else {
           fetchPromise = getCollectionInfo(nexus, collectionSlug, revisionNumber, revisionId)
             .then((result) => {
@@ -611,7 +612,7 @@ function processAttributes(state: IState, input: any, quick: boolean): PromiseBB
               }
               return result;
             })
-            .catch((err) => {
+            .catch((err: any) => {
               const errorLevel = ["COLLECTION_UNDER_MODERATION", "NOT_FOUND"].includes(err.code)
                 ? "warn"
                 : "error";
@@ -677,22 +678,24 @@ function processAttributes(state: IState, input: any, quick: boolean): PromiseBB
   });
 }
 
-function doDownload(api: IExtensionApi, url: string): PromiseBB<string> {
+function doDownload(api: IExtensionApi, url: string): Promise<string> {
   return (
     startDownload(api, nexus, url)
-      .catch(DownloadIsHTML, () => undefined)
+      .catch(only(DownloadIsHTML, () => undefined))
       // DataInvalid is used here to indicate invalid user input or invalid
       // data from remote, so it's presumably not a bug in Vortex
-      .catch(DataInvalid, () => {
-        api.showErrorNotification("Failed to start download", url, {
-          allowReport: false,
-        });
-        return PromiseBB.resolve(undefined);
-      })
-      .catch(UserCanceled, () => PromiseBB.resolve(undefined))
+      .catch(
+        only(DataInvalid, () => {
+          api.showErrorNotification("Failed to start download", url, {
+            allowReport: false,
+          });
+          return Promise.resolve(undefined);
+        }),
+      )
+      .catch(only(UserCanceled, () => Promise.resolve(undefined)))
       .catch((err) => {
         api.showErrorNotification("Failed to start download", err);
-        return PromiseBB.resolve(undefined);
+        return Promise.resolve(undefined);
       })
   );
 }
@@ -743,7 +746,7 @@ function makeNXMLinkCallback(api: IExtensionApi) {
         } else {
           api.events.emit("show-extension-page", nxmUrl.modId);
           bringToFront();
-          return PromiseBB.resolve();
+          return Promise.resolve();
         }
       } else {
         const { foregroundDL } = state.settings.interface;
@@ -772,7 +775,7 @@ function makeNXMLinkCallback(api: IExtensionApi) {
       .then(() => doDownload(api, url))
       .then((dlId) => {
         if (dlId === undefined || dlId === null) {
-          return PromiseBB.resolve(undefined);
+          return Promise.resolve(undefined);
         }
 
         const actions: Action[] = [setDownloadModInfo(dlId, "source", "nexus")];
@@ -790,7 +793,7 @@ function makeNXMLinkCallback(api: IExtensionApi) {
         }
         batchDispatch(api.store, actions);
 
-        return new PromiseBB((resolve, reject) => {
+        return new Promise<void>((resolve, reject) => {
           const currentState: IState = api.store.getState();
           const download = currentState.persistent.downloads.files[dlId];
           if (download === undefined) {
@@ -812,19 +815,23 @@ function makeNXMLinkCallback(api: IExtensionApi) {
       })
       // doDownload handles all download errors so the catches below are
       //  only for log in errors
-      .catch(UserCanceled, () => null)
-      .catch(ProcessCanceled, (err) => {
-        api.showErrorNotification("Log-in failed", err, {
-          id: "failed-get-nexus-key",
-          allowReport: false,
-        });
-      })
-      .catch(ServiceTemporarilyUnavailable, (err) => {
-        api.showErrorNotification("Service temporarily unavailable", err, {
-          id: "failed-get-nexus-key",
-          allowReport: false,
-        });
-      })
+      .catch(only(UserCanceled, () => null))
+      .catch(
+        only(ProcessCanceled, (err) => {
+          api.showErrorNotification("Log-in failed", err, {
+            id: "failed-get-nexus-key",
+            allowReport: false,
+          });
+        }),
+      )
+      .catch(
+        only(ServiceTemporarilyUnavailable, (err) => {
+          api.showErrorNotification("Service temporarily unavailable", err, {
+            id: "failed-get-nexus-key",
+            allowReport: false,
+          });
+        }),
+      )
       .catch((err) => {
         api.showErrorNotification("Failed to get access key", err, {
           id: "failed-get-nexus-key",
@@ -901,14 +908,14 @@ function makeRepositoryLookup(api: IExtensionApi, nexusConn: NexusT) {
     true,
   );
 
-  const queue = (repoInfo: IModRepoId): PromiseBB<Partial<IModFile>> => {
-    return new PromiseBB((resolve, reject) => {
+  const queue = (repoInfo: IModRepoId): Promise<Partial<IModFile>> => {
+    return new Promise((resolve, reject) => {
       pendingQueries.push({ repoInfo, resolve, reject });
       uidLookupDebouncer.schedule();
     });
   };
 
-  return (repoInfo: IModRepoId): PromiseBB<IModLookupResult[]> => {
+  return (repoInfo: IModRepoId): Promise<IModLookupResult[]> => {
     const modId = parseInt(repoInfo.modId, 10);
     const fileId = parseInt(repoInfo.fileId, 10);
 
@@ -1350,10 +1357,10 @@ function fixIds(api: IExtensionApi, instanceIds: string[]) {
   const gameMode = activeGameId(state);
   const mods = state.persistent.mods[gameMode];
   const downloads = state.persistent.downloads.files;
-  return PromiseBB.all(
+  return Promise.all(
     instanceIds.map((id) => {
       if (idValid(id, mods, downloads)) {
-        return PromiseBB.resolve();
+        return Promise.resolve();
       }
 
       let fileName: string;
@@ -1397,7 +1404,7 @@ function fixIds(api: IExtensionApi, instanceIds: string[]) {
             },
           );
         } else {
-          return checkModVersion(api.store, nexus, gameMode, mod).catch((err) => {
+          return checkModVersion(api.store, nexus, gameMode, mod).catch((err: any) => {
             if (err.statusCode === 403) {
               return queryResetSource(api, gameMode, mod);
             } else {
@@ -1408,12 +1415,12 @@ function fixIds(api: IExtensionApi, instanceIds: string[]) {
           });
         }
       }
-      return PromiseBB.resolve();
+      return Promise.resolve();
     }),
   ).then(() => null);
 }
 
-type AwaitLinkCB = (gameId: string, modId: number, fileId: number) => PromiseBB<string>;
+type AwaitLinkCB = (gameId: string, modId: number, fileId: number) => Promise<string>;
 
 interface IDLQueueItem {
   input: string;
@@ -1421,7 +1428,7 @@ interface IDLQueueItem {
   canceled: boolean;
   res: (res: IResolvedURL) => void;
   rej: (err: Error) => void;
-  queryRelevantUpdates: () => PromiseBB<IFileUpdate[]>;
+  queryRelevantUpdates: () => Promise<IFileUpdate[]>;
 }
 
 const freeDLQueue: IDLQueueItem[] = [];
@@ -1444,7 +1451,7 @@ function makeNXMProtocol(api: IExtensionApi, onAwaitLink: AwaitLinkCB) {
   function freeUserDownload(input: string, url: NXMUrl) {
     // non-premium user trying to download a file with no id, have to send the user to the
     // corresponding site to generate a proper link
-    return new PromiseBB<IResolvedURL>((resolve, reject, onCancel) => {
+    return new Promise<IResolvedURL>((resolve, reject) => {
       const res = (result: IResolvedURL) => {
         if (resolve !== undefined) {
           // just to make sure we remove the correct item, idx should always be 0
@@ -1514,11 +1521,6 @@ function makeNXMProtocol(api: IExtensionApi, onAwaitLink: AwaitLinkCB) {
         queryRelevantUpdates,
         canceled: false,
       };
-      onCancel(() => {
-        queueItems.canceled = true;
-        const idx = freeDLQueue.findIndex((iter) => iter.input === input);
-        freeDLQueue.splice(idx, 1);
-      });
       freeDLQueue.push(queueItems as any);
       api.store.dispatch(addFreeUserDLItem(input));
     });
@@ -1534,7 +1536,7 @@ function makeNXMProtocol(api: IExtensionApi, onAwaitLink: AwaitLinkCB) {
     input: string,
     url: NXMUrl,
     directDownloadEnabled: boolean = false,
-  ): PromiseBB<IResolvedURL> {
+  ): Promise<IResolvedURL> {
     const state = api.getState();
     const games = knownGames(state);
     const gameId = convertNXMIdReverse(games, url.gameId);
@@ -1544,7 +1546,7 @@ function makeNXMProtocol(api: IExtensionApi, onAwaitLink: AwaitLinkCB) {
     const revNumber = url.revisionNumber >= 0 ? url.revisionNumber : undefined;
 
     if (!["mod", "collection"].includes(url.type)) {
-      return PromiseBB.reject(new ProcessCanceled("Not a download url"));
+      return Promise.reject(new ProcessCanceled("Not a download url"));
     }
 
     // Create cache key
@@ -1556,7 +1558,7 @@ function makeNXMProtocol(api: IExtensionApi, onAwaitLink: AwaitLinkCB) {
     // Check cache first
     const cached = downloadURLCache[cacheKey];
     if (cached && Date.now() < cached.expires) {
-      return PromiseBB.resolve({
+      return Promise.resolve({
         urls: cached.urls,
         updatedUrl: input,
         meta: cached.meta,
@@ -1566,7 +1568,7 @@ function makeNXMProtocol(api: IExtensionApi, onAwaitLink: AwaitLinkCB) {
     const downloadKey = directDownloadEnabled ? undefined : url.key;
     const downloadExpires = directDownloadEnabled ? undefined : url.expires;
 
-    return PromiseBB.resolve()
+    return Promise.resolve()
       .then(() =>
         url.type === "mod"
           ? nexus
@@ -1600,7 +1602,7 @@ function makeNXMProtocol(api: IExtensionApi, onAwaitLink: AwaitLinkCB) {
               .catch((err) => {
                 err["collectionSlug"] = url.collectionSlug;
                 err["revisionNumber"] = url.revisionNumber;
-                return PromiseBB.reject(err);
+                return Promise.reject(err);
               })
               .then((revision: Partial<IRevision>) => {
                 revisionInfo = revision;
@@ -1633,42 +1635,48 @@ function makeNXMProtocol(api: IExtensionApi, onAwaitLink: AwaitLinkCB) {
                 return result;
               }),
       )
-      .catch(NexusError, (err) => {
-        const newError = new HTTPError(err.statusCode, err.message, err.request);
-        newError.stack = err.stack;
-        return PromiseBB.reject(newError);
-      })
-      .catch(HTTPError, (err) => {
-        // A 401 here means the Nexus client could not authenticate the
-        // request and could not (or did not) refresh its token. Reachable
-        // when persisted state says we have OAuth credentials but the live
-        // Nexus instance does not (e.g. updateToken never ran on startup,
-        // forced-logout migration path), when the refresh token has been
-        // revoked server-side, or on a resume after logout. Surface as a
-        // ProcessCanceled so reportDownloadError shows a friendly,
-        // non-reportable notification instead of letting the raw 401 fall
-        // through to the generic else branch with the Report button.
-        if (err.statusCode === 401) {
-          return PromiseBB.reject(new ProcessCanceled("You are not logged in to Nexus Mods!"));
-        }
-        return PromiseBB.reject(err);
-      })
-      .catch(RateLimitError, (err) => {
-        api.showErrorNotification("Rate limit exceeded", err, {
-          allowReport: false,
-        });
-        return PromiseBB.reject(err);
-      });
+      .catch(
+        only(NexusError, (err) => {
+          const newError = new HTTPError(err.statusCode, err.message, err.request);
+          newError.stack = err.stack;
+          return Promise.reject(newError);
+        }),
+      )
+      .catch(
+        only(HTTPError, (err) => {
+          // A 401 here means the Nexus client could not authenticate the
+          // request and could not (or did not) refresh its token. Reachable
+          // when persisted state says we have OAuth credentials but the live
+          // Nexus instance does not (e.g. updateToken never ran on startup,
+          // forced-logout migration path), when the refresh token has been
+          // revoked server-side, or on a resume after logout. Surface as a
+          // ProcessCanceled so reportDownloadError shows a friendly,
+          // non-reportable notification instead of letting the raw 401 fall
+          // through to the generic else branch with the Report button.
+          if (err.statusCode === 401) {
+            return Promise.reject(new ProcessCanceled("You are not logged in to Nexus Mods!"));
+          }
+          return Promise.reject(err);
+        }),
+      )
+      .catch(
+        only(RateLimitError, (err) => {
+          api.showErrorNotification("Rate limit exceeded", err, {
+            allowReport: false,
+          });
+          return Promise.reject(err);
+        }),
+      );
   }
 
-  const resolveFunc = (input: string): PromiseBB<IResolvedURL> => {
+  const resolveFunc = (input: string): Promise<IResolvedURL> => {
     const state = api.store.getState();
 
     let url: NXMUrl;
     try {
       url = new NXMUrl(input);
     } catch (err) {
-      return PromiseBB.reject(err);
+      return Promise.reject(err);
     }
 
     const userInfo: any = getSafe(state, ["persistent", "nexus", "userInfo"], undefined);
@@ -1684,7 +1692,7 @@ function makeNXMProtocol(api: IExtensionApi, onAwaitLink: AwaitLinkCB) {
           "You have to be logged into nexusmods.com with the same account that you use in Vortex.",
         { allowReport: false, replace: { userName } },
       );
-      return PromiseBB.reject(new ProcessCanceled("Wrong user id"));
+      return Promise.reject(new ProcessCanceled("Wrong user id"));
     }
 
     if (
@@ -1705,14 +1713,14 @@ function makeNXMProtocol(api: IExtensionApi, onAwaitLink: AwaitLinkCB) {
             return freeUserDownload(input, url);
           }
         })
-        .catch((err) => {
+        .catch((err: any) => {
           const message = getErrorMessageOrDefault(err);
           // Cancellation must propagate; otherwise sibling deps whose in-flight
           // mod-info queries get aborted re-enter freeUserDownload, repopulate
           // the queue, and the dialog re-opens behind the one the user just
           // dismissed.
           if (err instanceof UserCanceled || err instanceof ProcessCanceled) {
-            return PromiseBB.reject(err);
+            return Promise.reject(err);
           }
           // If we can't query mod info, fall back to free user flow
           log("warn", "failed to query mod info for direct download check", {
@@ -1732,7 +1740,7 @@ function onUpdated() {
   bringToFront();
 }
 
-type ResolveFunc = (input: string) => PromiseBB<IResolvedURL>;
+type ResolveFunc = (input: string) => Promise<IResolvedURL>;
 
 function onDownloadImpl(resolveFunc: ResolveFunc, inputUrl: string) {
   const queueItem = freeDLQueue.find((iter) => iter.input === inputUrl);
@@ -1785,7 +1793,7 @@ function onSkip(api: IExtensionApi, inputUrl: string) {
         api.events.emit("free-user-skipped-download", itemIdentifiers);
         queueItem.rej(new UserCanceled(true));
       })
-      .catch((err) => {
+      .catch((err: any) => {
         log("warn", "failed to query relevant updates on skip", {
           error: err.message,
         });
@@ -1964,12 +1972,12 @@ function init(context: IExtensionContext): boolean {
     () => {
       if (!sel.isLoggedIn(context.api.getState())) {
         log("warn", "Not logged in");
-        return PromiseBB.resolve();
+        return Promise.resolve();
       }
 
       context.api.events.emit("refresh-user-info");
 
-      return PromiseBB.resolve();
+      return Promise.resolve();
     },
     3000,
     true,
@@ -2034,7 +2042,7 @@ function init(context: IExtensionContext): boolean {
   const resolveFunc = makeNXMProtocol(
     context.api,
     (gameId: string, modId: number, fileId: number) =>
-      new PromiseBB((resolve) => {
+      new Promise((resolve) => {
         console.log("makeNXMProtocol", {
           gameId: gameId,
           modId: modId,

@@ -3,8 +3,6 @@ import * as path from "path";
 import { inspect } from "util";
 
 import { fs, util } from "@nexusmods/vortex-api";
-import Promise from "bluebird";
-
 class TraceImport {
   private mPath: string;
   private mLogFile: fs.WriteStream;

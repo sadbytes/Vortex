@@ -1,4 +1,3 @@
-import Bluebird from "bluebird";
 import * as reduxAct from "redux-act";
 
 import safeCreateAction from "../../../actions/safeCreateAction";
@@ -58,7 +57,7 @@ const setModsEnabled = (() => {
     modIds: string[],
     enabled: boolean,
     options: IEnableOptions,
-  ) => Bluebird<void>;
+  ) => Promise<void>;
 
   return (
     api: IExtensionApi,
@@ -84,7 +83,7 @@ const setModsEnabled = (() => {
             }
           }
 
-          return Bluebird.resolve();
+          return Promise.resolve();
         },
       );
     }
@@ -92,7 +91,7 @@ const setModsEnabled = (() => {
     {
       const profile: IProfile = profileById(api.getState(), profileIdIn);
       if (profile === undefined) {
-        return Bluebird.resolve();
+        return Promise.resolve();
       }
       const willChange = modIdsIn.filter(
         (id) => (profile.modState?.[id]?.enabled ?? false) !== enableIn,

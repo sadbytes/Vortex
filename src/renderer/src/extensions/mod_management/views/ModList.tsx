@@ -1726,7 +1726,7 @@ function mapDispatchToProps(dispatch: ThunkDispatch<any, null, Redux.Action>): I
       );
     },
     onShowDialog: (type, title, content, actions) =>
-      // showDialog thunk returns Bluebird — see comment in notifications.ts
+      // normalize the dispatched showDialog thunk result to a native promise
       Promise.resolve(dispatch(showDialog(type, title, content, actions))),
     onRemoveMods: (gameMode: string, modIds: string[]) =>
       batchDispatch(

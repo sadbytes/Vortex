@@ -1,6 +1,6 @@
 import * as path from "path";
 
-import Promise from "bluebird";
+import { util } from "@nexusmods/vortex-api";
 import turbowalk, { IEntry } from "turbowalk";
 
 import { CORRUPTED_NAME, MAX_SAVEGAMES } from "../constants";
@@ -74,7 +74,7 @@ export function refreshSavegames(
         truncated = true;
         saves = saves.slice(0, MAX_SAVEGAMES);
       }
-      return Promise.map(saves, (save) =>
+      return util.map(saves, (save) =>
         loadSaveGame(save.filePath, save.size, onAddSavegame, false).catch((err) => {
           failedReads.push(`[b]${path.basename(save.filePath)}[/b] - ${err.message}`);
         }),

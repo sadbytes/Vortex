@@ -5,7 +5,6 @@ import { BasicTracerProvider } from "@opentelemetry/sdk-trace-base";
 import { serializeSpan } from "@vortex/shared/telemetry";
 
 import { log } from "../logging";
-import { patchBluebirdContext } from "./bluebird-patch";
 import { createRendererResource } from "./resources";
 
 /**
@@ -58,10 +57,6 @@ export const createRendererTelemetryProvider = async (): Promise<void> => {
       // eventually removed from the renderer.
       contextManager: new ZoneContextManager(),
     });
-
-    // Bluebird bypasses the global Promise prototype that Zone.js patches,
-    // so cross-bluebird `.then()` boundaries still need an explicit hop.
-    patchBluebirdContext();
   } catch (err) {
     log("error", "Failed to create renderer telemetry provider", {
       error: err,

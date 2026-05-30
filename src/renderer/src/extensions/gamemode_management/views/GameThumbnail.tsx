@@ -1,7 +1,6 @@
 import * as path from "path";
 import * as url from "url";
 
-import type PromiseBB from "bluebird";
 import type { TFunction } from "i18next";
 import * as React from "react";
 import { Button, Panel, Popover } from "react-bootstrap";
@@ -26,7 +25,7 @@ export interface IBaseProps {
   game: IGameStored;
   active: boolean;
   discovered?: boolean;
-  onRefreshGameInfo?: (gameId: string) => PromiseBB<void>;
+  onRefreshGameInfo?: (gameId: string) => Promise<void>;
   type: string;
   getBounds?: () => ClientRect;
   container?: HTMLElement;

@@ -9,7 +9,6 @@
   "author": "Black Tree Gaming Ltd.",
   "license": "GPL-3.0",
   "devDependencies": {
-    "@types/bluebird": "catalog:",
     "@types/iconv-lite": "catalog:",
     "@types/react": "catalog:",
     "@types/react-bootstrap": "catalog:",
@@ -17,7 +16,6 @@
     "@types/react-redux": "catalog:",
     "@types/react-router": "catalog:",
     "@types/redux-thunk": "catalog:",
-    "bluebird": "catalog:",
     "copyfiles": "catalog:",
     "i18next": "catalog:",
     "json-loader": "catalog:",

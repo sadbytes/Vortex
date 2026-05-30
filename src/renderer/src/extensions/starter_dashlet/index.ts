@@ -1,12 +1,12 @@
 import path from "path";
 
-import PromiseBB from "bluebird";
 import memoize from "memoize-one";
 
 import type { IState } from "@/types/api";
 
 import type { IExtensionApi, IExtensionContext } from "../../types/IExtensionContext";
 import type { ITestResult } from "../../types/ITestResult";
+import { each, reduce } from "../../util/asyncpromise";
 import * as fs from "../../util/fs";
 import { activeGameId } from "../../util/selectors";
 import type { IStarterInfo } from "../../util/StarterInfo";
@@ -17,8 +17,7 @@ import { incrementDeploymentCounter } from "../mod_management/reducers/deploymen
 import { setPrimaryTool } from "./actions";
 import settingsReducer from "./reducers";
 import Tools from "./Tools";
-
-function testPrimaryTool(api: IExtensionApi): PromiseBB<ITestResult> {
+function testPrimaryTool(api: IExtensionApi): Promise<ITestResult> {
   const state = api.store.getState();
   const notifyInvalid = () => {
     api.sendNotification({
@@ -48,7 +47,7 @@ function testPrimaryTool(api: IExtensionApi): PromiseBB<ITestResult> {
 
   const gameMode = activeGameId(state);
   if (gameMode === undefined) {
-    return PromiseBB.resolve(undefined);
+    return Promise.resolve(undefined);
   }
   const primaryToolId = getSafe(
     state,
@@ -74,20 +73,20 @@ function testPrimaryTool(api: IExtensionApi): PromiseBB<ITestResult> {
 
       // Make sure all the required files are still present.
       const requiredFiles = primaryTool.requiredFiles.map((file) => path.join(workingDir, file));
-      return PromiseBB.each(requiredFiles, (file: string) => fs.statAsync(file))
-        .then(() => PromiseBB.resolve(undefined))
+      return each(requiredFiles, (file: string) => fs.statAsync(file))
+        .then(() => Promise.resolve(undefined))
         .catch((err) => {
           notifyInvalid();
           api.store.dispatch(setPrimaryTool(gameMode, undefined));
-          return PromiseBB.resolve(undefined);
+          return Promise.resolve(undefined);
         });
     }
   }
 
-  return PromiseBB.resolve(undefined);
+  return Promise.resolve(undefined);
 }
 
-const onDeploymentEvent = (api: IExtensionApi): PromiseBB<void> => {
+const onDeploymentEvent = (api: IExtensionApi): Promise<void> => {
   const state = api.store.getState();
   const gameMode = activeGameId(state);
   if (gameMode !== undefined) {
@@ -95,7 +94,7 @@ const onDeploymentEvent = (api: IExtensionApi): PromiseBB<void> => {
     api.store.dispatch(incrementDeploymentCounter(gameMode));
     return api.emitAndAwait("discover-tools", gameMode);
   }
-  return PromiseBB.resolve();
+  return Promise.resolve();
 };
 
 const toolsValidation = memoize(validateTools);
@@ -139,14 +138,14 @@ function validateTools(api: IExtensionApi, starters: IStarterInfo[], gameMode: s
     {},
   );
   if (discovery?.path === undefined) {
-    return PromiseBB.resolve([]);
+    return Promise.resolve([]);
   }
 
-  return PromiseBB.reduce(
+  return reduce(
     starters,
     (accum, iter) => {
       if (!iter?.exePath) {
-        return PromiseBB.resolve(accum);
+        return Promise.resolve(accum);
       }
       const exePath = path.isAbsolute(iter.exePath)
         ? iter.exePath
@@ -154,8 +153,8 @@ function validateTools(api: IExtensionApi, starters: IStarterInfo[], gameMode: s
       return fs
         .statAsync(exePath)
         .then(() => accum.push(iter.id))
-        .catch(() => PromiseBB.resolve())
-        .then(() => PromiseBB.resolve(accum));
+        .catch(() => Promise.resolve())
+        .then(() => Promise.resolve(accum));
     },
     [],
   );

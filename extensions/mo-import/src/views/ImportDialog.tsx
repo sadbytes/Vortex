@@ -14,7 +14,6 @@ import {
   types,
   util,
 } from "@nexusmods/vortex-api";
-import Promise from "bluebird";
 import * as I18next from "i18next";
 import * as React from "react";
 import {

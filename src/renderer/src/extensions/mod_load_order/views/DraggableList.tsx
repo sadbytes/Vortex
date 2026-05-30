@@ -1,4 +1,3 @@
-import PromiseBB from "bluebird";
 import * as React from "react";
 import { ListGroup } from "react-bootstrap";
 import type {
@@ -202,7 +201,7 @@ class DraggableList extends ComponentEx<IProps, IState> {
     this.applyDebouncer = new util.Debouncer(
       (list: ILoadOrderDisplayItem[]) => {
         this.props.apply(list);
-        return PromiseBB.resolve() as any;
+        return Promise.resolve() as any;
       },
       300,
       false,

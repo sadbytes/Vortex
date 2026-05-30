@@ -1,7 +1,6 @@
 import * as path from "path";
 
 import { fs, util } from "@nexusmods/vortex-api";
-import Promise from "bluebird";
 
 function convertGameId(input: string): string {
   if (input === "skyrimse") {
@@ -59,15 +58,17 @@ function findInstances(gameId: string): Promise<string[][]> {
   const base = path.resolve(util.getVortexPath("appData"), "..", "local", "Black_Tree_Gaming");
   return fs
     .readdirAsync(base)
-    .filter((fileName: string) =>
-      fs.statAsync(path.join(base, fileName)).then((stat) => stat.isDirectory()),
+    .then((__arr) =>
+      util.filter(__arr, (fileName: string) =>
+        fs.statAsync(path.join(base, fileName)).then((stat) => stat.isDirectory()),
+      ),
     )
     .then((instances: string[]) =>
-      Promise.map(instances, (instance) =>
+      util.map(instances, (instance) =>
         fs
           .readdirAsync(path.join(base, instance))
           .then((versions: string[]) =>
-            Promise.map(versions, (version) =>
+            util.map(versions, (version) =>
               fs
                 .readFileAsync(path.join(base, instance, version, "user.config"))
                 .then((data: Buffer) => getVirtualFolder(data.toString(), gameId)),

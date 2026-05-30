@@ -1,7 +1,5 @@
 import * as path from "path";
 
-import PromiseBB from "bluebird";
-
 import * as fs from "../../../util/fs";
 import getVortexPath from "../../../util/getVortexPath";
 import { deBOM, truthy } from "../../../util/util";
@@ -11,7 +9,7 @@ import { deBOM, truthy } from "../../../util/util";
  *
  * @returns
  */
-function chromePath(): PromiseBB<string> {
+function chromePath(): Promise<string> {
   const appPath = getVortexPath("appData");
   if (process.platform === "win32") {
     const userData =
@@ -27,18 +25,18 @@ function chromePath(): PromiseBB<string> {
             truthy(dat) && truthy(dat.profile) && truthy(dat.profile.last_used)
               ? dat.profile.last_used
               : "Default";
-          return PromiseBB.resolve(path.join(userData, prof, "Preferences"));
+          return Promise.resolve(path.join(userData, prof, "Preferences"));
         } catch (err) {
-          return PromiseBB.reject(err);
+          return Promise.reject(err);
         }
       })
-      .catch((err) =>
+      .catch((err: any) =>
         ["ENOENT", "EBUSY", "EPERM", "EISDIR"].indexOf(err.code) !== -1
-          ? PromiseBB.resolve(path.join(userData, "Default", "Preferences"))
-          : PromiseBB.reject(err),
+          ? Promise.resolve(path.join(userData, "Default", "Preferences"))
+          : Promise.reject(err),
       );
   } else {
-    return PromiseBB.resolve(
+    return Promise.resolve(
       process.platform === "linux"
         ? path.resolve(appPath, "google-chrome", "Local State")
         : path.resolve(appPath, "Google", "Chrome", "Local State"),

@@ -1,7 +1,6 @@
 import * as path from "path";
 
 import { fs, log, selectors, types, util } from "@nexusmods/vortex-api";
-import Bluebird from "bluebird";
 import * as crc32 from "crc-32";
 
 import { ReplicateHashMismatchError } from "../util/errors";
@@ -55,7 +54,7 @@ export async function matchChecksums(
   await util.walk(
     localPath,
     (input) => {
-      return Bluebird.resolve((entries = [].concat(entries, input)));
+      return Promise.resolve((entries = [].concat(entries, input)));
     },
     {},
   );

@@ -1,7 +1,6 @@
 import * as path from "path";
 
 import { actions, fs, log, selectors, types, util } from "@nexusmods/vortex-api";
-import Bluebird from "bluebird";
 import { pl } from "date-fns/locale";
 import getVersion from "exe-version";
 import i18next from "i18next";
@@ -16,9 +15,36 @@ import { IPluginLoot, IPlugins, IPluginsLoot } from "./types/IPlugins";
 import { gameDataPath, gameSupported, nativePlugins, pluginPath } from "./util/gameSupport";
 import { downloadMasterlist, downloadPrelude } from "./util/masterlist";
 
+// native replacement for Bluebird.promisifyAll: adds err-first-callback
+// `<name>Async` variants for every method on the target (and its prototype).
+function promisifyAll<T>(target: T): any {
+  const SUFFIX = "Async";
+  const wrap = (obj: any) => {
+    if (obj == null) return;
+    for (const key of Object.getOwnPropertyNames(obj)) {
+      let fn: any;
+      try {
+        fn = obj[key];
+      } catch {
+        continue;
+      }
+      if (typeof fn === "function" && !key.endsWith(SUFFIX) && key !== "constructor") {
+        obj[key + SUFFIX] = function (this: any, ...args: any[]) {
+          return new Promise((resolve, reject) => {
+            fn.call(this, ...args, (err: any, res: any) => (err ? reject(err) : resolve(res)));
+          });
+        };
+      }
+    }
+  };
+  wrap(target);
+  wrap((target as any)?.prototype);
+  return target;
+}
+
 const MAX_RESTARTS = 3;
 
-const LootProm: any = Bluebird.promisifyAll(LootAsync);
+const LootProm: any = promisifyAll(LootAsync);
 
 enum EdgeType {
   userGroup = "userGroup",
@@ -42,11 +68,11 @@ interface ICycleEdge {
 
 class LootInterface {
   private mExtensionApi: types.IExtensionApi;
-  private mInitPromise: Bluebird<{ game: string; loot: typeof LootProm }> = Bluebird.resolve({
+  private mInitPromise: Promise<{ game: string; loot: typeof LootProm }> = Promise.resolve({
     game: undefined,
     loot: undefined,
   });
-  private mSortPromise: Bluebird<string[]> = Bluebird.resolve([]);
+  private mSortPromise: Promise<string[]> = Promise.resolve([]);
 
   private mUserlistTime: Date;
   private mRestarts: number = MAX_RESTARTS;
@@ -191,12 +217,15 @@ class LootInterface {
         // this should be a waste of time, pluginList should already only contain files
         // that are really there but loot produces really annoying error messages so I want to
         // be sure.
-        pluginIds = await Bluebird.filter(pluginIds, (pluginId) =>
-          fs
-            .statAsync(pluginList[pluginId].filePath)
-            .then(() => true)
-            .catch(() => false),
+        const pluginExists = await Promise.all(
+          pluginIds.map((pluginId) =>
+            fs
+              .statAsync(pluginList[pluginId].filePath)
+              .then(() => true)
+              .catch(() => false),
+          ),
         );
+        pluginIds = pluginIds.filter((_pluginId, idx) => pluginExists[idx]);
 
         const pluginNames = pluginIds.map((pluginId: string) =>
           path.basename(pluginList[pluginId].filePath),
@@ -384,7 +413,7 @@ class LootInterface {
 
     let onRes: (x: { game: string; loot: LootAsync }) => void;
 
-    this.mInitPromise = new Bluebird<{ game: string; loot: LootAsync }>((resolve) => {
+    this.mInitPromise = new Promise<{ game: string; loot: LootAsync }>((resolve) => {
       onRes = resolve;
     });
 
@@ -419,13 +448,13 @@ class LootInterface {
           Game: gameMode,
           Path: gamePath,
         });
-        this.mInitPromise = Bluebird.resolve({
+        this.mInitPromise = Promise.resolve({
           game: gameMode,
           loot: undefined,
         });
       }
     } else {
-      this.mInitPromise = Bluebird.resolve({ game: gameMode, loot: undefined });
+      this.mInitPromise = Promise.resolve({ game: gameMode, loot: undefined });
     }
   }
 
@@ -661,7 +690,7 @@ class LootInterface {
   };
 
   // tslint:disable-next-line:member-ordering
-  private readLists = Bluebird.method(async (gameMode: string, loot: typeof LootProm) => {
+  private readLists = async (gameMode: string, loot: typeof LootProm) => {
     const t = this.mExtensionApi.translate;
     const masterlistPath = path.join(
       util.getVortexPath("userData"),
@@ -715,7 +744,7 @@ class LootInterface {
         } as any);
       }
     }
-  });
+  };
 
   private convertGameId(gameMode: string, masterlist: boolean) {
     // the vr games use the same masterlist as the base game but have their own game id within loot.
@@ -736,7 +765,7 @@ class LootInterface {
   }
 
   // tslint:disable-next-line:member-ordering
-  private init = Bluebird.method(async (gameMode: string) => {
+  private init = async (gameMode: string) => {
     const localPath = pluginPath(gameMode);
     try {
       await fs.ensureDirAsync(localPath);
@@ -749,7 +778,7 @@ class LootInterface {
     let loot: any;
 
     try {
-      loot = Bluebird.promisifyAll(
+      loot = promisifyAll(
         await LootProm.createAsync(
           this.convertGameId(gameMode, false),
           this.gamePath,
@@ -806,10 +835,10 @@ class LootInterface {
     }
 
     return { game: gameMode, loot };
-  });
+  };
 
   private fork = (modulePath: string, args: string[]) => {
-    const attempt = (retries: number): Bluebird<void> => {
+    const attempt = (retries: number): Promise<void> => {
       return (this.mExtensionApi as any)
         .runExecutable(process.execPath, [modulePath].concat(args || []), {
           detach: false,
@@ -824,15 +853,15 @@ class LootInterface {
             log("debug", "LOOT fork got EBUSY, retrying", {
               retriesLeft: retries,
             });
-            return Bluebird.delay(500).then(() => attempt(retries - 1));
+            return util.delay(500).then(() => attempt(retries - 1));
           }
-          return Bluebird.reject(err);
+          return Promise.reject(err);
         });
     };
 
     attempt(5)
-      .catch(util.UserCanceled, () => null)
-      .catch(util.ProcessCanceled, () => null)
+      .catch(util.only(util.UserCanceled, () => null))
+      .catch(util.only(util.ProcessCanceled, () => null))
       .catch((err) => {
         log("warn", "LOOT process died", { error: err.message });
         if (this.mRestarts > 0) {

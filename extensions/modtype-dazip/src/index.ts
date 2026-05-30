@@ -1,7 +1,6 @@
 import * as path from "path";
 
 import { log, types, selectors, util } from "@nexusmods/vortex-api";
-import Promise from "bluebird";
 
 import { DA_GAMES } from "./constants";
 import { migrate100 } from "./migrations";

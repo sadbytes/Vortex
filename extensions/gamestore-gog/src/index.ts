@@ -1,7 +1,6 @@
 import * as path from "path";
 
 import { fs, log, types } from "@nexusmods/vortex-api";
-import Bluebird from "bluebird";
 import * as winapi from "winapi-bindings";
 
 const STORE_ID = "gog";
@@ -21,8 +20,8 @@ class GoGLauncher implements types.IGameStore {
   public id: string = STORE_ID;
   public name: string = STORE_NAME;
   public priority: number = STORE_PRIORITY;
-  private mClientPath: Bluebird<string>;
-  private mCache: Bluebird<types.IGameStoreEntry[]>;
+  private mClientPath: Promise<string>;
+  private mCache: Promise<types.IGameStoreEntry[]>;
 
   constructor() {
     if (process.platform === "win32") {
@@ -33,7 +32,7 @@ class GoGLauncher implements types.IGameStore {
           "SOFTWARE\\WOW6432Node\\GOG.com\\GalaxyClient\\paths",
           "client",
         );
-        this.mClientPath = Bluebird.resolve(gogPath.value as string);
+        this.mClientPath = Promise.resolve(gogPath.value as string);
       } catch (err) {
         log("info", "gog not found", { error: err.message });
         this.mClientPath = undefined;
@@ -49,20 +48,20 @@ class GoGLauncher implements types.IGameStore {
   /**
    * find the first game that matches the specified name pattern
    */
-  public findByName(namePattern: string): Bluebird<types.IGameStoreEntry> {
+  public findByName(namePattern: string): Promise<types.IGameStoreEntry> {
     const re = new RegExp("^" + namePattern + "$");
     return this.allGames()
       .then((entries) => entries.find((entry) => re.test(entry.name)))
       .then((entry) => {
         if (entry === undefined) {
-          return Bluebird.reject(new types.GameEntryNotFound(namePattern, STORE_ID));
+          return Promise.reject(new types.GameEntryNotFound(namePattern, STORE_ID));
         } else {
-          return Bluebird.resolve(entry);
+          return Promise.resolve(entry);
         }
       });
   }
 
-  public launchGame(appInfo: any, api?: types.IExtensionApi): Bluebird<void> {
+  public launchGame(appInfo: any, api?: types.IExtensionApi): Promise<void> {
     return this.getExecInfo(appInfo).then((execInfo) =>
       api.runExecutable(execInfo.execPath, execInfo.arguments, {
         cwd: path.dirname(execInfo.execPath),
@@ -72,11 +71,11 @@ class GoGLauncher implements types.IGameStore {
     );
   }
 
-  public getExecInfo(appId: string): Bluebird<types.IExecInfo> {
+  public getExecInfo(appId: string): Promise<types.IExecInfo> {
     return this.allGames().then((entries) => {
       const gameEntry = entries.find((entry) => entry.appid === appId);
       return gameEntry === undefined
-        ? Bluebird.reject(new types.GameEntryNotFound(appId, STORE_ID))
+        ? Promise.reject(new types.GameEntryNotFound(appId, STORE_ID))
         : this.mClientPath.then((basePath) => {
             const gogClientExec = {
               execPath: path.join(basePath, GOG_EXEC),
@@ -87,7 +86,7 @@ class GoGLauncher implements types.IGameStore {
               ],
             };
 
-            return Bluebird.resolve(gogClientExec);
+            return Promise.resolve(gogClientExec);
           });
     });
   }
@@ -95,7 +94,7 @@ class GoGLauncher implements types.IGameStore {
   /**
    * find the first game with the specified appid or one of the specified appids
    */
-  public findByAppId(appId: string | string[]): Bluebird<types.IGameStoreEntry> {
+  public findByAppId(appId: string | string[]): Promise<types.IGameStoreEntry> {
     const matcher = Array.isArray(appId)
       ? (entry: types.IGameStoreEntry) => appId.includes(entry.appid)
       : (entry: types.IGameStoreEntry) => appId === entry.appid;
@@ -103,42 +102,42 @@ class GoGLauncher implements types.IGameStore {
     return this.allGames().then((entries) => {
       const gameEntry = entries.find(matcher);
       if (gameEntry === undefined) {
-        return Bluebird.reject(
+        return Promise.reject(
           new types.GameEntryNotFound(Array.isArray(appId) ? appId.join(", ") : appId, STORE_ID),
         );
       } else {
-        return Bluebird.resolve(gameEntry);
+        return Promise.resolve(gameEntry);
       }
     });
   }
 
-  public allGames(): Bluebird<types.IGameStoreEntry[]> {
+  public allGames(): Promise<types.IGameStoreEntry[]> {
     if (!this.mCache) {
       this.mCache = this.getGameEntries();
     }
     return this.mCache;
   }
 
-  public reloadGames(): Bluebird<void> {
-    return new Bluebird((resolve) => {
+  public reloadGames(): Promise<void> {
+    return new Promise((resolve) => {
       this.mCache = this.getGameEntries();
       return resolve();
     });
   }
 
-  public getGameStorePath(): Bluebird<string> {
+  public getGameStorePath(): Promise<string> {
     return !!this.mClientPath
       ? this.mClientPath.then((basePath) =>
-          Bluebird.resolve(path.join(basePath, "GalaxyClient.exe")),
+          Promise.resolve(path.join(basePath, "GalaxyClient.exe")),
         )
-      : Bluebird.resolve(undefined);
+      : Promise.resolve(undefined);
   }
 
   public identifyGame(
     gamePath: string,
     fallback: (gamePath: string) => PromiseLike<boolean>,
-  ): Bluebird<boolean> {
-    return Bluebird.all([this.fileExists(path.join(gamePath, "gog.ico")), fallback(gamePath)]).then(
+  ): Promise<boolean> {
+    return Promise.all([this.fileExists(path.join(gamePath, "gog.ico")), fallback(gamePath)]).then(
       ([custom, fallback]) => {
         if (custom !== fallback) {
           log("warn", "(gog) game identification inconclusive", {
@@ -159,9 +158,9 @@ class GoGLauncher implements types.IGameStore {
       .catch(() => false);
   }
 
-  private getGameEntries(): Bluebird<types.IGameStoreEntry[]> {
+  private getGameEntries(): Promise<types.IGameStoreEntry[]> {
     return !!this.mClientPath
-      ? new Bluebird<types.IGameStoreEntry[]>((resolve, reject) => {
+      ? new Promise<types.IGameStoreEntry[]>((resolve, reject) => {
           try {
             winapi.WithRegOpen("HKEY_LOCAL_MACHINE", REG_GOG_GAMES, (hkey) => {
               const keys = winapi.RegEnumKeys(hkey);
@@ -188,7 +187,7 @@ class GoGLauncher implements types.IGameStore {
             return err.code === "ENOENT" ? resolve([]) : reject(err);
           }
         })
-      : Bluebird.resolve([]);
+      : Promise.resolve([]);
   }
 }
 

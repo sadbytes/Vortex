@@ -4,7 +4,6 @@
     - Mods without a module.ini will be deployed to the native module
         folder based upon their file extension.
 */
-const Promise = require("bluebird");
 const path = require("path");
 const winapi = require("winapi-bindings");
 const { fs, util } = require("@nexusmods/vortex-api");

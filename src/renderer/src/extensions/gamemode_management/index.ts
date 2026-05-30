@@ -2,7 +2,6 @@ import * as path from "path";
 
 import { mdiGamepadSquare } from "@mdi/js";
 import { getErrorCode, getErrorMessageOrDefault } from "@vortex/shared";
-import PromiseBB from "bluebird";
 import { clipboard } from "electron";
 import * as fsExtra from "fs-extra";
 import React from "react";
@@ -27,6 +26,7 @@ import type { IGameStoreEntry } from "../../types/IGameStoreEntry";
 import type { NotificationDismiss } from "../../types/INotification";
 import type { IProfile, IRunningTool, IState } from "../../types/IState";
 import type { IEditChoice, ITableAttribute } from "../../types/ITableAttribute";
+import { map, only } from "../../util/asyncpromise";
 import { COMPANY_ID, NEXUSMODS_EXT_ID } from "../../util/constants";
 import { DataInvalid, ProcessCanceled, SetupError, UserCanceled } from "../../util/CustomErrors";
 import * as fs from "../../util/fs";
@@ -75,7 +75,6 @@ import ModTypeWidget from "./views/ModTypeWidget";
 import PathSelectionDialog from "./views/PathSelection";
 import ProgressFooter from "./views/ProgressFooter";
 import RecentlyManagedDashlet from "./views/RecentlyManagedDashlet";
-
 const gameStoreLaunchers: IGameStore[] = [];
 
 const $ = local<{
@@ -98,7 +97,7 @@ interface IProvider {
 
 const gameInfoProviders: IProvider[] = [];
 
-function refreshGameInfo(store: Redux.Store<IState>, gameId: string): PromiseBB<void> {
+function refreshGameInfo(store: Redux.Store<IState>, gameId: string): Promise<void> {
   interface IKeyProvider {
     [key: string]: { priority: number; provider: string };
   }
@@ -150,7 +149,7 @@ function refreshGameInfo(store: Redux.Store<IState>, gameId: string): PromiseBB<
     }
   };
 
-  return PromiseBB.map(providersToQuery, (prov) => {
+  return map(providersToQuery, (prov) => {
     const expires = now + prov.expireMS;
     return Promise.resolve(prov.query({ ...game, ...gameDiscovery }))
       .then((details) => {
@@ -188,10 +187,10 @@ function refreshGameInfo(store: Redux.Store<IState>, gameId: string): PromiseBB<
   }).then(() => undefined);
 }
 
-function verifyGamePath(game: IGame, gamePath: string): PromiseBB<void> {
+function verifyGamePath(game: IGame, gamePath: string): Promise<void> {
   return verifyGamePathMarkers(game.id, gamePath, game.requiredFiles || [])
     .then(() => undefined)
-    .catch((err) => {
+    .catch((err: any) => {
       // if the error is anything other than "the file doesn't exist" we assume
       // the file is there and can't be accessed because of permissions or something.
       // If the game gets started through the launcher, that may be completely valid
@@ -199,7 +198,7 @@ function verifyGamePath(game: IGame, gamePath: string): PromiseBB<void> {
       if (err.code !== "ENOENT") {
         return undefined;
       }
-      return PromiseBB.reject(err);
+      return Promise.reject(err);
     });
 }
 
@@ -221,15 +220,17 @@ function findGamePath(
   selectedPath: string,
   depth: number,
   maxDepth: number,
-): PromiseBB<string> {
+): Promise<string> {
   if (depth > maxDepth) {
-    return PromiseBB.reject(new ProcessCanceled("not found"));
+    return Promise.reject(new ProcessCanceled("not found"));
   }
 
   return verifyGamePath(game, selectedPath)
     .then(() => selectedPath)
-    .catch({ code: "ENOENT" }, () =>
-      findGamePath(game, path.dirname(selectedPath), depth + 1, maxDepth),
+    .catch(
+      only({ code: "ENOENT" }, () =>
+        findGamePath(game, path.dirname(selectedPath), depth + 1, maxDepth),
+      ),
     );
 }
 
@@ -239,9 +240,9 @@ function findGamePath(
 function confirmGameStore(
   api: IExtensionApi,
   storeId: string | undefined,
-): PromiseBB<string | undefined> {
+): Promise<string | undefined> {
   if (process.platform === "linux") {
-    return PromiseBB.resolve(storeId);
+    return Promise.resolve(storeId);
   }
 
   const gameStores = getGameStores();
@@ -273,7 +274,7 @@ function confirmGameStore(
     .then((res) => {
       const selected = Object.keys(res.input).find((iter) => res.input[iter]);
       if (selected === undefined) {
-        return PromiseBB.reject(new UserCanceled());
+        return Promise.reject(new UserCanceled());
       }
       return selected === "other" ? storeId : selected;
     });
@@ -282,7 +283,7 @@ function confirmGameStore(
 function manualGameStoreSelection(
   api: IExtensionApi,
   correctedGamePath: string,
-): PromiseBB<{ store: string; corrected: string; winePrefixPath?: string }> {
+): Promise<{ store: string; corrected: string; winePrefixPath?: string }> {
   return GameStoreHelper.identifyStore(correctedGamePath)
     .then(
       (storeId) => confirmGameStore(api, storeId),
@@ -291,7 +292,7 @@ function manualGameStoreSelection(
         // store identification must not block adding the game - continue with
         // an unknown store. On other platforms the failure propagates as before.
         if (process.platform !== "linux") {
-          return PromiseBB.reject(err);
+          return Promise.reject(err);
         }
         log("debug", "failed to identify game store for manually selected path", {
           path: correctedGamePath,
@@ -312,23 +313,23 @@ function manualGameStoreSelection(
 function findWinePrefixPathForGamePath(
   gamePath: string,
   storeId: string | undefined,
-): PromiseBB<string | undefined> {
+): Promise<string | undefined> {
   if (process.platform !== "linux" || storeId !== "steam") {
-    return PromiseBB.resolve(undefined);
+    return Promise.resolve(undefined);
   }
 
   let store: IGameStore | undefined;
   try {
     store = GameStoreHelper.getGameStore(storeId);
   } catch (err) {
-    return PromiseBB.resolve(undefined);
+    return Promise.resolve(undefined);
   }
 
   if (store === undefined) {
-    return PromiseBB.resolve(undefined);
+    return Promise.resolve(undefined);
   }
 
-  return PromiseBB.resolve(getNormalizeFunc(gamePath))
+  return Promise.resolve(getNormalizeFunc(gamePath))
     .then((normalize) =>
       store.allGames().then((entries: IGameStoreEntry[]) => {
         const entry = entries.find((iter) => normalize(iter.gamePath) === normalize(gamePath));
@@ -347,9 +348,9 @@ function findWinePrefixPathForGamePath(
 function promptWinePrefixPath(
   api: IExtensionApi,
   currentPrefixPath: string | undefined,
-): PromiseBB<string | undefined> {
+): Promise<string | undefined> {
   if (process.platform === "win32" || currentPrefixPath !== undefined) {
-    return PromiseBB.resolve(currentPrefixPath);
+    return Promise.resolve(currentPrefixPath);
   }
 
   return api
@@ -380,7 +381,7 @@ function promptWinePrefixPath(
     });
 }
 
-function browseGameLocation(api: IExtensionApi, gameId: string): PromiseBB<void> {
+function browseGameLocation(api: IExtensionApi, gameId: string): Promise<void> {
   const state: IState = api.store.getState();
 
   if (gameById(state, gameId) === undefined) {
@@ -401,12 +402,12 @@ function browseGameLocation(api: IExtensionApi, gameId: string): PromiseBB<void>
   const game = getGame(gameId);
 
   if (game === undefined) {
-    return PromiseBB.resolve();
+    return Promise.resolve();
   }
 
   const discovery = state.settings.gameMode.discovered[gameId];
 
-  return new PromiseBB<void>((resolve) => {
+  return new Promise<void>((resolve) => {
     const defaultPath = discovery?.path;
 
     // Check for test path stored in global (for automated testing)
@@ -415,7 +416,7 @@ function browseGameLocation(api: IExtensionApi, gameId: string): PromiseBB<void>
     // If test path is set, use it; otherwise open the dialog
     const pathPromise =
       testPath !== undefined
-        ? PromiseBB.resolve(testPath)
+        ? Promise.resolve(testPath)
         : api.selectDir(defaultPath !== undefined ? { defaultPath } : {});
 
     // Clear the global after using it
@@ -539,7 +540,7 @@ function installGameExtension(
   api: IExtensionApi,
   gameId: string,
   dlInfo: IExtensionDownloadInfo,
-): PromiseBB<void> {
+): Promise<void> {
   if (dlInfo !== undefined) {
     log("info", "installing missing game extension", { gameId });
     const name = dlInfo.name.replace(/^Game: /, "");
@@ -569,30 +570,30 @@ function installGameExtension(
           api.events.emit("analytics-track-click-event", "Games", "Stop managing game");
           return api.ext.unmanageGame?.(gameId, dlInfo.name);
         } else {
-          return PromiseBB.resolve(false);
+          return Promise.resolve(false);
         }
       })
       .catch((err) => {
         if (err instanceof UserCanceled || err instanceof ProcessCanceled) {
-          return PromiseBB.resolve();
+          return Promise.resolve();
         }
         api.showErrorNotification("Failed to install game extension", err);
       });
   } else {
-    return PromiseBB.resolve();
+    return Promise.resolve();
   }
 }
 
-function awaitProfileSwitch(api: IExtensionApi): PromiseBB<string> {
+function awaitProfileSwitch(api: IExtensionApi): Promise<string> {
   const { activeProfileId, nextProfileId } = api.getState().settings.profiles;
   log("info", "wait for profile switch to complete", {
     nextProfileId,
     activeProfileId,
   });
   if (activeProfileId !== nextProfileId) {
-    return new PromiseBB((resolve) => api.events.once("profile-did-change", resolve));
+    return new Promise((resolve) => api.events.once("profile-did-change", resolve));
   } else {
-    return PromiseBB.resolve(activeProfileId);
+    return Promise.resolve(activeProfileId);
   }
 }
 
@@ -600,7 +601,7 @@ function removeDisappearedGames(
   api: IExtensionApi,
   discoveredGames: Set<string>,
   gameStubs?: { [gameId: string]: IExtensionDownloadInfo },
-): PromiseBB<void> {
+): Promise<void> {
   let state: IState = api.getState();
   const discovered = state.settings.gameMode.discovered;
   const known = state.session.gameMode.known;
@@ -609,22 +610,22 @@ function removeDisappearedGames(
 
   log("info", "remove disappeared games");
 
-  const assertRequiredFiles = (requiredFiles: string[], gameId: string): PromiseBB<void> => {
+  const assertRequiredFiles = (requiredFiles: string[], gameId: string): Promise<void> => {
     if (requiredFiles === undefined) {
-      return PromiseBB.resolve();
+      return Promise.resolve();
     }
     return verifyGamePathMarkers(gameId, discovered[gameId].path, requiredFiles)
       .then(() => undefined)
-      .catch((err) => {
+      .catch((err: any) => {
         if (err.code === "ENOENT") {
-          return PromiseBB.reject(err);
+          return Promise.reject(err);
         } else {
-          return PromiseBB.resolve();
+          return Promise.resolve();
         }
       });
   };
 
-  return PromiseBB.map(
+  return map(
     Object.keys(discovered).filter((gameId) => discovered[gameId].path !== undefined),
     (gameId) => {
       const stored = known.find((iter) => iter.id === gameId);
@@ -634,13 +635,13 @@ function removeDisappearedGames(
         .catch((err) => {
           const code = getErrorCode(err);
           if (code === "ENOENT") {
-            return PromiseBB.reject(err);
+            return Promise.reject(err);
           }
           // if we can't stat the game directory for any other reason than it being missing
           // (almost certainly permission error) we just assume the game is installed and
           // can be launched through the store because that's how it works with the xbox store
           // and we have to support that.
-          return PromiseBB.resolve();
+          return Promise.resolve();
         })
         .catch((err) => {
           const gameName = stored?.name ?? discovered[gameId].name;
@@ -688,16 +689,16 @@ function removeDisappearedGames(
 
       if (gameStubs !== undefined) {
         const knownGameIds = new Set(known.map((game) => game.id));
-        return PromiseBB.all(
+        return Promise.all(
           Array.from(managedGames).map((gameId) => {
             if (knownGameIds.has(gameId)) {
-              return PromiseBB.resolve();
+              return Promise.resolve();
             }
             return installGameExtension(api, gameId, gameStubs[gameId]);
           }),
-        ).then(() => PromiseBB.resolve());
+        ).then(() => Promise.resolve());
       } else {
-        return PromiseBB.resolve();
+        return Promise.resolve();
       }
     });
 }
@@ -920,8 +921,8 @@ function init(context: IExtensionContext): boolean {
     ["path"],
     (game: IGame & IDiscoveryResult) =>
       game.path == null || typeof game.path !== "string"
-        ? PromiseBB.resolve({})
-        : PromiseBB.resolve({
+        ? Promise.resolve({})
+        : Promise.resolve({
             path: {
               title: "Path",
               value: path.normalize(game.path),
@@ -936,7 +937,7 @@ function init(context: IExtensionContext): boolean {
     60 * 1000,
     ["store"],
     (game: IGame & IDiscoveryResult) =>
-      PromiseBB.resolve({
+      Promise.resolve({
         store: {
           title: "Game Store",
           value: getGameStore(game.store)?.name ?? context.api.translate("Unknown"),
@@ -1065,8 +1066,8 @@ function init(context: IExtensionContext): boolean {
   );
 
   const onScan = (paths: string[]) => $.gameModeManager.startSearchDiscovery(paths);
-  const onSelectPath = (basePath: string): PromiseBB<string> =>
-    PromiseBB.resolve(
+  const onSelectPath = (basePath: string): Promise<string> =>
+    Promise.resolve(
       context.api.selectDir({
         defaultPath: basePath,
       }),
@@ -1120,7 +1121,7 @@ function init(context: IExtensionContext): boolean {
       if (game !== undefined) {
         return $.gameModeManager.startQuickDiscovery([game]);
       } else {
-        return PromiseBB.resolve();
+        return Promise.resolve();
       }
     });
 
@@ -1153,10 +1154,10 @@ function init(context: IExtensionContext): boolean {
     events.on("start-discovery", () => {
       try {
         const state = context.api.getState();
-        const initPromise: PromiseBB<void> =
+        const initPromise: Promise<void> =
           state.settings.gameMode.searchPaths.length > 0
-            ? PromiseBB.resolve()
-            : PromiseBB.resolve(getDriveList(context.api))
+            ? Promise.resolve()
+            : Promise.resolve(getDriveList(context.api))
                 .catch(() => [])
                 .then((drives) => {
                   context.api.store.dispatch(setGameSearchPaths(drives));
@@ -1177,27 +1178,27 @@ function init(context: IExtensionContext): boolean {
     events.on("refresh-game-info", (gameId: string, callback: (err: Error) => void) => {
       refreshGameInfo(store, gameId)
         .then(() => callback(null))
-        .catch((err) => callback(err));
+        .catch((err: any) => callback(err));
     });
 
     events.on("manually-set-game-location", (gameId: string, callback: (err: Error) => void) => {
       browseGameLocation(context.api, gameId)
         .then(() => callback(null))
-        .catch((err) => callback(err));
+        .catch((err: any) => callback(err));
     });
 
     const changeGameMode = (
       oldGameId: string,
       newGameId: string,
       currentProfileId: string,
-    ): PromiseBB<void> => {
+    ): Promise<void> => {
       if (newGameId === undefined) {
-        return PromiseBB.resolve();
+        return Promise.resolve();
       }
       log("debug", "change game mode", { oldGameId, newGameId });
 
       if (getGame(newGameId) === undefined) {
-        return PromiseBB.reject(new Error(`Attempt to switch to unknown game "${newGameId}"`));
+        return Promise.reject(new Error(`Attempt to switch to unknown game "${newGameId}"`));
       }
 
       const id = context.api.sendNotification({
@@ -1216,12 +1217,12 @@ function init(context: IExtensionContext): boolean {
           // a setup-error when trying to resolve the mod path
           const discovery = discoveryByGame(store.getState(), newGameId);
           if (discovery === undefined || discovery.path === undefined) {
-            return PromiseBB.reject(new ProcessCanceled("The game is no longer discovered"));
+            return Promise.reject(new ProcessCanceled("The game is no longer discovered"));
           }
           getGame(newGameId).getModPaths(discovery.path);
         })
         .then(() => $.gameModeManager.setGameMode(oldGameId, newGameId, currentProfileId))
-        .catch((err) => {
+        .catch((err: any) => {
           if (err instanceof UserCanceled || err instanceof ProcessCanceled) {
             // The other branches all surface the failure via showError /
             // sendNotification (which log themselves). UserCanceled and
@@ -1304,7 +1305,7 @@ function init(context: IExtensionContext): boolean {
         const prom =
           oldGameId !== newGameId
             ? changeGameMode(oldGameId, newGameId, current)
-            : PromiseBB.resolve();
+            : Promise.resolve();
 
         prom.then(() => {
           const game = {

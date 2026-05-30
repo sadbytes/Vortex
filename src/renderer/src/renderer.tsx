@@ -94,7 +94,6 @@ import "./util/application.electron";
 import { getErrorCode, getErrorMessageOrDefault, unknownToError } from "@vortex/shared";
 import type { IParameters } from "@vortex/shared/cli";
 import type { AppInitMetadata } from "@vortex/shared/ipc";
-import Bluebird from "bluebird";
 import { ipcRenderer, webFrame } from "electron";
 import React from "react";
 
@@ -166,13 +165,6 @@ if (process.platform === "win32") {
     return oldPrep !== undefined ? oldPrep(error, stack) : error.stack;
   };
 }
-
-// allow promises to be cancelled.
-Bluebird.config({
-  cancellation: true,
-  // long stack traces would be sooo nice but the performance cost in some places is ridiculous
-  longStackTraces: false,
-});
 
 // set up store. State is persisted via persistDiffMiddleware which
 // sends diffs to the main process for storage
@@ -703,7 +695,8 @@ async function init(): Promise<ExtensionManager | null> {
     const id = args[args.length - 1];
     const cb = (...cbArgs) => {
       const newCBArgs = cbArgs.map((arg) => {
-        if (!(arg instanceof Bluebird)) {
+        // relay any promise-like (native or otherwise) result over IPC
+        if (arg == null || typeof arg.then !== "function") {
           return arg;
         }
         const promId = shortid();

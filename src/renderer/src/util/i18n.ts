@@ -1,6 +1,5 @@
 import * as path from "path";
 
-import Bluebird from "bluebird";
 import type { TOptions, i18n } from "i18next";
 import I18next from "i18next";
 import FSBackend from "i18next-fs-backend";
@@ -140,7 +139,7 @@ class HighlightPP {
  * @param {string} language
  * @returns {I18next.I18n}
  */
-function init(language: string, translationExts: () => IExtension[]): Bluebird<IInitResult> {
+function init(language: string, translationExts: () => IExtension[]): Promise<IInitResult> {
   // reset to english if the language isn't valid
   try {
     new Date().toLocaleString(language);
@@ -156,7 +155,7 @@ function init(language: string, translationExts: () => IExtension[]): Bluebird<I
   }
   i18nObj.use(MultiBackend as any).use(initReactI18next);
 
-  return Bluebird.resolve(
+  return Promise.resolve(
     i18nObj.init({
       lng: language,
       fallbackLng: "en",
@@ -211,16 +210,17 @@ function init(language: string, translationExts: () => IExtension[]): Bluebird<I
       },
     }),
   )
-    .tap((tFunc) => {
+    .then((tFunc) => {
       actualT = tFunc;
+      return tFunc;
     })
     .then((tFunc) =>
-      Bluebird.resolve({
+      Promise.resolve({
         i18n: i18nObj,
         tFunc,
       }),
     )
-    .catch((error) => ({
+    .catch((error: Error) => ({
       i18n: i18nObj,
       tFunc: fallbackTFunc,
       error,

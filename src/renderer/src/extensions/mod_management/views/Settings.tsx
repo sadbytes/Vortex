@@ -323,7 +323,7 @@ class Settings extends ComponentEx<IProps, IComponentState> {
       (_setAttribute, _setError) =>
         fs
           .statAsync(oldPath)
-          .catch((err) => {
+          .catch((err: any) => {
             // The initial mods staging folder is missing! - this may be a valid case if:
             //  1. HDD or removable media is faulty or has become unseated and is
             //  no longer detectable by the OS.
@@ -383,7 +383,7 @@ class Settings extends ComponentEx<IProps, IComponentState> {
                     this.nextState.progressFile = path.basename(from);
                   }
                 },
-              ).catch((err) => {
+              ).catch((err: any) => {
                 if (err?.code === "ENOENT") {
                   return didReset ? Promise.resolve() : Promise.reject(err);
                 }
@@ -553,7 +553,7 @@ class Settings extends ComponentEx<IProps, IComponentState> {
         onSetTransfer(gameMode, undefined);
         onSetInstallPath(gameMode, this.state.installPath);
       })
-      .catch((err) => {
+      .catch((err: any) => {
         if (err instanceof TemporaryError) {
           onShowError("Failed to move directories, please try again", err, false);
           return;
@@ -665,7 +665,7 @@ class Settings extends ComponentEx<IProps, IComponentState> {
               onSetTransfer(gameMode, undefined);
               this.nextState.busy = undefined;
             })
-            .catch((err) => {
+            .catch((err: any) => {
               this.nextState.busy = undefined;
               if (err instanceof UserCanceled) {
                 return;
@@ -1206,7 +1206,7 @@ function mapDispatchToProps(dispatch: ThunkDispatch<any, null, Redux.Action>): I
       dispatch(setInstallPathMode(installPathMode));
     },
     onShowDialog: (type, title, content, actions) =>
-      // showDialog thunk returns Bluebird — see comment in notifications.ts
+      // normalize the dispatched showDialog thunk result to a native promise
       Promise.resolve(dispatch(showDialog(type, title, content, actions))),
     onShowError: (
       message: string,

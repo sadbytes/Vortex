@@ -1,7 +1,6 @@
 import * as os from "os";
 import * as path from "path";
 
-import PromiseBB from "bluebird";
 import update from "immutability-helper";
 import * as React from "react";
 import { Button, Checkbox, Jumbotron, ListGroup, ListGroupItem, Modal } from "react-bootstrap";
@@ -269,7 +268,7 @@ class DiagnosticsFilesDialog extends ComponentEx<IProps, IComponentState> {
     );
   }
 
-  private updateLogs(): PromiseBB<void> {
+  private updateLogs(): Promise<void> {
     const { onShowError } = this.props;
     return loadVortexLogs()
       .then((sessions) => {
@@ -279,7 +278,7 @@ class DiagnosticsFilesDialog extends ComponentEx<IProps, IComponentState> {
           }),
         );
       })
-      .catch((err) => {
+      .catch((err: any) => {
         onShowError("Failed to read Vortex logs", err);
       });
   }
@@ -323,12 +322,12 @@ class DiagnosticsFilesDialog extends ComponentEx<IProps, IComponentState> {
 
     this.props.onHide();
     const logPath = path.join(nativeCrashesPath, "session.log");
-    fs.ensureDirWritableAsync(nativeCrashesPath, () => PromiseBB.resolve())
+    fs.ensureDirWritableAsync(nativeCrashesPath, () => Promise.resolve())
       .then(() => fs.writeFileAsync(logPath, fullLog))
       .then(() => {
         this.context.api.events.emit("report-log-error", logPath);
       })
-      .catch((err) => {
+      .catch((err: any) => {
         if (!(err instanceof UserCanceled)) {
           onShowError("Failed to write log session file", err);
         }

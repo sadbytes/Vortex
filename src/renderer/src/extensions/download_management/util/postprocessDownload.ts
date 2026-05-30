@@ -29,7 +29,7 @@ export function finalizeDownload(api: IExtensionApi, id: string, filePath: strin
   };
   return api
     .genMd5Hash(filePath, progressHash)
-    .catch((err) => {
+    .catch((err: any) => {
       if (["EBUSY", "ENOENT", "EPERM"].includes(err.code)) {
         // try a second time, might be the AV interfering with the new file
         return delayed(100).then(() => api.genMd5Hash(filePath, progressHash));
@@ -45,13 +45,13 @@ export function finalizeDownload(api: IExtensionApi, id: string, filePath: strin
       api.events.emit("did-finish-download", id, "finished");
 
       // Run metadata lookup asynchronously without blocking download completion
-      queryInfo(api, [id], false).catch((err) => {
+      queryInfo(api, [id], false).catch((err: any) => {
         // Log error but don't fail the download
         log("warn", "Failed to query download metadata", getErrorMessageOrDefault(err));
       });
       return Promise.resolve();
     })
-    .catch((err) => {
+    .catch((err: any) => {
       // If MD5 calculation fails, still mark download as finished
       api.store.dispatch(finishDownload(id, "finished", undefined));
       api.events.emit("did-finish-download", id, "finished");

@@ -1,7 +1,6 @@
 import * as path from "path";
 import { pathToFileURL } from "url";
 
-import type PromiseBB from "bluebird";
 import type { TFunction } from "i18next";
 import * as React from "react";
 import { ListGroupItem, Media, Popover } from "react-bootstrap";
@@ -29,8 +28,8 @@ export interface IProps {
   type: string;
   getBounds: () => ClientRect;
   container: HTMLElement;
-  onRefreshGameInfo: (gameId: string) => PromiseBB<void>;
-  onBrowseGameLocation: (gameId: string) => PromiseBB<void>;
+  onRefreshGameInfo: (gameId: string) => Promise<void>;
+  onBrowseGameLocation: (gameId: string) => Promise<void>;
 }
 
 /**

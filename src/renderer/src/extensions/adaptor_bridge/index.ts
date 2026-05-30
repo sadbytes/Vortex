@@ -35,8 +35,6 @@
 
 import * as path from "path";
 
-import Bluebird from "bluebird"; // Used for setup callback return type
-
 import type { IInstruction } from "../../extensions/mod_management/types/IInstallResult";
 import type { IExtensionContext } from "../../types/IExtensionContext";
 import type { IState } from "../../types/IState";
@@ -575,7 +573,7 @@ function registerAdaptor(context: IExtensionContext, adaptor: AdaptorEntry): voi
      * Resolution chain: paths → tools + mod types (both need paths)
      */
     setup: (discovery) =>
-      Bluebird.resolve(
+      Promise.resolve(
         (async () => {
           // Invalidate caches on re-discovery (install moved, different store).
           pathsResolved = false;
@@ -675,7 +673,7 @@ function registerAdaptor(context: IExtensionContext, adaptor: AdaptorEntry): voi
                 50,
                 (gId) => gId === gameId,
                 () => nativePath,
-                () => Bluebird.resolve(false),
+                () => Promise.resolve(false),
               );
             }
           }

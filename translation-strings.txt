@@ -376,7 +376,6 @@ src/extensions/installer_fomod/index.ts:902:          const listenerCountBefore 
 src/extensions/installer_fomod/index.ts:911:          const listenerCountAfter = process.listenerCount('exit');
 src/extensions/installer_fomod/index.ts:1140:    const currentListenerCount = process.listenerCount('exit');
 src/extensions/installer_fomod/index.ts:1261:    const messages = cleanData.split('\uffff');
-src/extensions/installer_fomod/index.ts:1441:  context.registerTest('dotnet-installed', 'startup', () => Bluebird.resolve(checkNetInstall(context.api)));
 src/extensions/installer_fomod/index.ts:1637:              parameters: { br: '[br][/br]', url: `[url=${NET_CORE_DOWNLOAD_SITE}]${t('.NET website.')}[/url]` },
 src/extensions/installer_fomod/index.ts:1678:                        context.api.events.emit('show-main-page', 'application_settings');
 src/extensions/installer_fomod/views/InstallerDialog.tsx:113:          {group?.name ?? `<${t('Missing group name')}>`}
@@ -2035,7 +2034,6 @@ extensions/games/game-stardewvalley/configMod.js:305:            yield api.emitA
 extensions/games/game-stardewvalley/configMod.ts:230:    api.events.emit('create-mod', profile.gameId, mod, async (error) => {
 extensions/games/game-stardewvalley/configMod.ts:312:    await api.emitAndAwait('deploy-single-mod', GAME_ID, configMod.mod.id, false);
 extensions/games/game-stardewvalley/configMod.ts:314:    await api.emitAndAwait('deploy-single-mod', GAME_ID, configMod.mod.id, true); 
-extensions/games/game-stardewvalley/index.js:610:    context.registerTest('sdv-incompatible-mods', 'gamemode-activated', () => bluebird_1.default.resolve((0, tests_1.testSMAPIOutdated)(context.api, dependencyManager)));
 extensions/games/game-stardewvalley/index.js:613:        context.api.setStylesheet('sdv', path.join(__dirname, 'sdvstyle.scss'));
 extensions/games/game-stardewvalley/index.ts:820:  context.registerTest('sdv-missing-dependencies', 'gamemode-activated',
 extensions/games/game-stardewvalley/index.ts:823:  context.registerTest('sdv-incompatible-mods', 'gamemode-activated',

@@ -1,7 +1,5 @@
 import * as path from "path";
 
-import Bluebird from "bluebird";
-
 import type { IExtensionApi, ILookupResult, IModInfo } from "../../../types/IExtensionContext";
 import { ProcessCanceled } from "../../../util/CustomErrors";
 import { batchDispatch, truthy } from "../../../util/util";
@@ -28,7 +26,7 @@ export function guessFromFileName(fileName: string): string {
 export function queryLookupResult(
   api: IExtensionApi,
   lookupResult: ILookupResult[],
-): Bluebird<number> {
+): Promise<number> {
   const t = api.translate;
   const gameMode = activeGameId(api.getState());
 
@@ -134,7 +132,7 @@ export function fillNexusIdByMD5(
   fileName: string,
   downloadPath: string,
   hasArchive: boolean,
-): Bluebird<void> {
+): Promise<void> {
   const hasValidIds = truthy(mod?.attributes?.modId) && truthy(mod?.attributes?.fileId);
   const isNewestVersion = hasValidIds && mod?.attributes?.newestFileId === mod?.attributes?.fileId;
   // We're not using the gameId in the query intentionally as we can't
@@ -169,7 +167,7 @@ export function fillNexusIdByMD5(
       }, []);
       if (applicable.length > 0) {
         const idxProm =
-          applicable.length === 1 ? Bluebird.resolve(0) : queryLookupResult(api, applicable);
+          applicable.length === 1 ? Promise.resolve(0) : queryLookupResult(api, applicable);
 
         return idxProm
           .then(async (idx) => {

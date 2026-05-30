@@ -1,4 +1,3 @@
-const Promise = require("bluebird");
 const path = require("path");
 const { fs, selectors, util } = require("@nexusmods/vortex-api");
 
@@ -74,7 +73,7 @@ function main(context) {
       const modPaths = game.getModPaths(discovery.path);
       const installPath = selectors.installPathForGame(state, GAME_ID);
 
-      await Promise.map(files, async (entry) => {
+      await util.map(files, async (entry) => {
         // only act if we definitively know which mod owns the file
         if (entry.candidates.length === 1) {
           const mod = util.getSafe(

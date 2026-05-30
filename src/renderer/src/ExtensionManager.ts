@@ -7,7 +7,6 @@ import * as path from "path";
 import { VCREDIST_URL } from "@vortex/shared";
 import { getErrorCode, getErrorMessageOrDefault, unknownToError } from "@vortex/shared";
 import type { PreloadWindow } from "@vortex/shared/preload";
-import PromiseBB from "bluebird";
 import type { OpenDialogOptions, SaveDialogOptions } from "electron";
 import * as fs from "fs-extra";
 import * as fuzz from "fuzzball";
@@ -76,6 +75,7 @@ import type {
 } from "./types/IState";
 import { getApplication } from "./util/application";
 import { Archive } from "./util/archives";
+import { each, mapSeries, only } from "./util/asyncpromise";
 import { fileMD5 } from "./util/checksum";
 import { COMPANY_ID } from "./util/constants";
 import {
@@ -109,7 +109,6 @@ import {
 } from "./util/util";
 import { webpackRequireHack } from "./util/webpack-hacks";
 import { isToastSystemDisabled } from "./views/layout/ToastContainer";
-
 const modmeta = lazyRequire<typeof modmetaT>(() => require("modmeta-db"));
 
 export function isExtSame(installed: IExtension, remote: IAvailableExtension): boolean {
@@ -656,7 +655,7 @@ type CBFunc = (...args: any[]) => void;
 interface IStartHook {
   priority: number;
   id: string;
-  hook: (input: IRunParameters) => PromiseBB<IRunParameters>;
+  hook: (input: IRunParameters) => Promise<IRunParameters>;
 }
 
 function convertMD5Result(input: ILookupResult): IModLookupResult {
@@ -665,7 +664,7 @@ function convertMD5Result(input: ILookupResult): IModLookupResult {
 
 interface IRepositoryLookup {
   preferOverMD5: boolean;
-  func: (id: IModRepoId) => PromiseBB<IModLookupResult[]>;
+  func: (id: IModRepoId) => Promise<IModLookupResult[]>;
 }
 
 /**
@@ -703,7 +702,7 @@ class ExtensionManager {
   private mRepositoryLookup: { [repository: string]: IRepositoryLookup } = {};
   private mArchiveHandlers: { [extension: string]: ArchiveHandlerCreator };
   private mModDB: modmetaT.ModDB;
-  private mModDBPromise: PromiseBB<void>;
+  private mModDBPromise: Promise<void>;
   private mModDBGame: string;
   private mModDBAPIKey: string;
   private mModDBCache: { [id: string]: ILookupResult[] } = {};
@@ -721,7 +720,7 @@ class ExtensionManager {
   private mProgrammaticMetaServers: { [id: string]: modmetaT.IServer } = {};
   private mForceDBReconnect: boolean = false;
   private mOnUIStarted: () => void;
-  private mUIStartedPromise: PromiseBB<void>;
+  private mUIStartedPromise: Promise<void>;
   private mOutdated: string[] = [];
   private mFailedWatchers: Set<string> = new Set();
   private mExtensionFormats: string[] = ["index.cjs", "index.js"];
@@ -756,7 +755,7 @@ class ExtensionManager {
       this.mEventEmitter.setMaxListeners(100);
     }
 
-    this.mUIStartedPromise = new PromiseBB((resolve) => {
+    this.mUIStartedPromise = new Promise((resolve) => {
       this.mOnUIStarted = resolve;
     });
 
@@ -1150,11 +1149,7 @@ class ExtensionManager {
     );
     this.apply(
       "registerStartHook",
-      (
-        priority: number,
-        id: string,
-        hook: (input: IRunParameters) => PromiseBB<IRunParameters>,
-      ) => {
+      (priority: number, id: string, hook: (input: IRunParameters) => Promise<IRunParameters>) => {
         this.mStartHooks.push({ priority, id, hook });
       },
     );
@@ -1425,7 +1420,7 @@ class ExtensionManager {
    * call the "once" function for all extensions. This should really only be called
    * once.
    */
-  public doOnce(): PromiseBB<void> {
+  public doOnce(): Promise<void> {
     // Since ExtensionManager is renderer-only, we need to handle both once and onceMain
     const onceCalls = this.mContextProxyHandler.getCalls("once");
     const onceMainCalls = this.mContextProxyHandler.getCalls("onceMain");
@@ -1453,7 +1448,7 @@ class ExtensionManager {
       );
     };
 
-    return PromiseBB.mapSeries(allCalls, (call, idx) => {
+    return mapSeries(allCalls, (call, idx) => {
       const isMainCall = onceMainCalls.includes(call);
       log("debug", isMainCall ? "onceMain" : "once", {
         extension: call.extension,
@@ -1470,8 +1465,8 @@ class ExtensionManager {
           cb(call.extension, idx);
         });
 
-        let prom: PromiseBB<void>;
-        prom = call.arguments[0]() || PromiseBB.resolve();
+        let prom: Promise<void>;
+        prom = call.arguments[0]() || Promise.resolve();
 
         const start = Date.now();
         return timeout(prom, 60000, {
@@ -1487,11 +1482,12 @@ class ExtensionManager {
               });
             }
           })
-          .catch(TimeoutError, () => {
-            reportError(new Error("Initialization didn't finish in time."), call, false);
-          })
           .catch((err) => {
-            reportError(err, call);
+            if (err instanceof TimeoutError) {
+              reportError(new Error("Initialization didn't finish in time."), call, false);
+            } else {
+              reportError(err, call);
+            }
           });
       } catch (err) {
         reportError(err, call);
@@ -1534,8 +1530,8 @@ class ExtensionManager {
     }
   };
 
-  private queryLoadTimeout(extension: string): PromiseBB<boolean> {
-    return PromiseBB.resolve(
+  private queryLoadTimeout(extension: string): Promise<boolean> {
+    return Promise.resolve(
       showMessageBox({
         type: "warning",
         title: "Extension slow",
@@ -1548,7 +1544,7 @@ class ExtensionManager {
     ).then((result) => result.response === 1);
   }
 
-  private getModDB = (): PromiseBB<modmetaT.ModDB> => {
+  private getModDB = (): Promise<modmetaT.ModDB> => {
     const gameMode = activeGameId(this.mApi.store.getState());
     const currentKey = getSafe(
       this.mApi.store.getState(),
@@ -1560,13 +1556,13 @@ class ExtensionManager {
 
     let onDone: () => void;
     if (this.mModDBPromise === undefined) {
-      this.mModDBPromise = new PromiseBB<void>((resolve, reject) => {
+      this.mModDBPromise = new Promise<void>((resolve, reject) => {
         onDone = () => {
           this.mModDBPromise = undefined;
           resolve();
         };
       });
-      init = PromiseBB.resolve();
+      init = Promise.resolve();
     } else {
       init = this.mModDBPromise;
     }
@@ -1585,11 +1581,11 @@ class ExtensionManager {
             return this.mModDB.close().then(() => (this.mModDB = undefined));
           }
         }
-        return PromiseBB.resolve();
+        return Promise.resolve();
       })
       .then(() =>
         this.mModDB !== undefined
-          ? PromiseBB.resolve()
+          ? Promise.resolve()
           : this.connectMetaDB(gameMode, currentKey).then((modDB) => {
               this.mModDB = modDB;
               this.mModDBGame = gameMode;
@@ -1638,9 +1634,11 @@ class ExtensionManager {
       .sort((lhs, rhs) => (lhs.priority ?? 100) - (rhs.priority ?? 100));
   }
 
-  private connectMetaDB(gameId: string, apiKey: string): PromiseBB<modmetaT.ModDB> {
+  private connectMetaDB(gameId: string, apiKey: string): Promise<modmetaT.ModDB> {
     const dbPath = path.join(getVortexPath("userData"), "metadb");
-    return modmeta.ModDB.create(dbPath, gameId, this.getMetaServerList(), log).catch((err) => {
+    return Promise.resolve(
+      modmeta.ModDB.create(dbPath, gameId, this.getMetaServerList(), log),
+    ).catch((err) => {
       return this.mApi
         .showDialog(
           "error",
@@ -1654,7 +1652,7 @@ class ExtensionManager {
         .then((result) => {
           if (result.action === "Quit") {
             getApplication().quit();
-            return PromiseBB.reject(new ProcessCanceled("meta db locked"));
+            return Promise.reject(new ProcessCanceled("meta db locked"));
           }
           return this.connectMetaDB(gameId, apiKey);
         });
@@ -1789,7 +1787,7 @@ class ExtensionManager {
   }
 
   private migrateExtensions() {
-    type MigrationFunc = (oldVersion: string) => PromiseBB<void>;
+    type MigrationFunc = (oldVersion: string) => Promise<void>;
 
     const migrations: { [ext: string]: MigrationFunc[] } = {};
 
@@ -1814,7 +1812,7 @@ class ExtensionManager {
             if (migrations[ext.name] === undefined) {
               this.mApi.store.dispatch(setExtensionVersion(ext.name, ext.info.version));
             } else {
-              PromiseBB.mapSeries(migrations[ext.name], (mig) => mig(oldVersion))
+              mapSeries(migrations[ext.name], (mig) => mig(oldVersion))
                 .then(() => {
                   log("info", "set extension version", {
                     name: ext.name,
@@ -1846,7 +1844,7 @@ class ExtensionManager {
     return getVortexPath(name as any);
   }
 
-  private selectFile(options: IOpenOptions): PromiseBB<string> {
+  private selectFile(options: IOpenOptions): Promise<string> {
     const fullOptions: OpenDialogOptions = {
       ..._.omit(options, ["create"]),
       properties: ["openFile"],
@@ -1854,14 +1852,14 @@ class ExtensionManager {
     if (options.create === true) {
       fullOptions.properties.push("promptToCreate");
     }
-    return PromiseBB.resolve(showOpenDialog(fullOptions)).then((result) =>
+    return Promise.resolve(showOpenDialog(fullOptions)).then((result) =>
       result.filePaths !== undefined && result.filePaths.length > 0
         ? result.filePaths[0]
         : undefined,
     );
   }
 
-  private saveFile(options: ISaveOptions): PromiseBB<string> {
+  private saveFile(options: ISaveOptions): Promise<string> {
     const fullOptions: SaveDialogOptions = {
       //..._.omit(options, ['create']),
       //properties: ['showOverwriteConfirmation'],
@@ -1870,7 +1868,7 @@ class ExtensionManager {
     //if (options === true) {
     //fullOptions.properties.push('showOverwriteConfirmation');
     //}
-    return PromiseBB.resolve(showSaveDialog(fullOptions)).then((result) =>
+    return Promise.resolve(showSaveDialog(fullOptions)).then((result) =>
       result.filePath !== undefined ? result.filePath : undefined,
     );
   }
@@ -1890,7 +1888,7 @@ class ExtensionManager {
         { name: "Python", extensions: ["py"] },
       ],
     };
-    return PromiseBB.resolve(showOpenDialog(fullOptions)).then((result) =>
+    return Promise.resolve(showOpenDialog(fullOptions)).then((result) =>
       result.filePaths !== undefined && result.filePaths.length > 0
         ? result.filePaths[0]
         : undefined,
@@ -1902,7 +1900,7 @@ class ExtensionManager {
       ..._.omit(options, ["create"]),
       properties: ["openDirectory"],
     };
-    return PromiseBB.resolve(showOpenDialog(fullOptions)).then((result) =>
+    return Promise.resolve(showOpenDialog(fullOptions)).then((result) =>
       result.filePaths !== undefined && result.filePaths.length > 0
         ? result.filePaths[0]
         : undefined,
@@ -1929,7 +1927,7 @@ class ExtensionManager {
   private registerRepositoryLookup = (
     repository: string,
     preferOverMD5: boolean,
-    func: (id: IModRepoId) => PromiseBB<IModLookupResult[]>,
+    func: (id: IModRepoId) => Promise<IModLookupResult[]>,
   ) => {
     this.mRepositoryLookup[repository] = { preferOverMD5, func };
   };
@@ -1946,7 +1944,7 @@ class ExtensionManager {
   private lookupModReference = (
     reference: IModReference,
     options?: ILookupOptions,
-  ): PromiseBB<IModLookupResult[]> => {
+  ): Promise<IModLookupResult[]> => {
     if (options === undefined) {
       options = {};
     }
@@ -1956,9 +1954,9 @@ class ExtensionManager {
 
     let lookup: {
       preferOverMD5: boolean;
-      func: (id: IModRepoId) => PromiseBB<IModLookupResult[]>;
+      func: (id: IModRepoId) => Promise<IModLookupResult[]>;
     };
-    let preMD5: PromiseBB<IModLookupResult[]> = PromiseBB.resolve([]);
+    let preMD5: Promise<IModLookupResult[]> = Promise.resolve([]);
     if (reference.repo !== undefined) {
       lookup = this.mRepositoryLookup[reference.repo.repository];
     }
@@ -1976,14 +1974,17 @@ class ExtensionManager {
         } else {
           return this.getModDB()
             .then((modDB) => modDB.getByReference(reference))
-            .filter((mod: ILookupResult) => {
-              if (options.requireURL === true) {
-                return truthy(mod.value.sourceURI);
-              } else {
-                return true;
-              }
-            })
-            .map((mod: ILookupResult) => convertMD5Result(mod));
+            .then((lookupResults: ILookupResult[]) =>
+              lookupResults
+                .filter((mod: ILookupResult) => {
+                  if (options.requireURL === true) {
+                    return truthy(mod.value.sourceURI);
+                  } else {
+                    return true;
+                  }
+                })
+                .map((mod: ILookupResult) => convertMD5Result(mod)),
+            );
         }
       })
       .then((results: IModLookupResult[]) => {
@@ -2030,7 +2031,7 @@ class ExtensionManager {
   private lookupModMeta = (
     detail: ILookupDetails,
     ignoreCache?: boolean,
-  ): PromiseBB<ILookupResult[]> => {
+  ): Promise<ILookupResult[]> => {
     if (detail.fileName !== undefined && detail.fileSize === 0) {
       log("error", "trying to calculate hash for an empty file", {
         name: detail.fileName,
@@ -2038,23 +2039,23 @@ class ExtensionManager {
       });
       const err = new ProcessCanceled("trying to calculate hash for an empty file");
       err["fileName"] = detail.fileName;
-      return PromiseBB.reject(err);
+      return Promise.reject(err);
     }
     if (detail.fileMD5 === undefined && detail.filePath === undefined) {
-      return PromiseBB.resolve([]);
+      return Promise.resolve([]);
     }
     let lookupId = this.modLookupId(detail);
     if (this.mModDBCache[lookupId] !== undefined && ignoreCache !== true) {
-      return PromiseBB.resolve(this.mModDBCache[lookupId]);
+      return Promise.resolve(this.mModDBCache[lookupId]);
     }
     let fileMD5 = detail.fileMD5;
     let fileSize = detail.fileSize;
 
     if (fileMD5 === undefined && detail.filePath === undefined) {
-      return PromiseBB.resolve([]);
+      return Promise.resolve([]);
     }
 
-    let promise: PromiseBB<void>;
+    let promise: Promise<void>;
 
     if (fileMD5 === undefined) {
       promise = this.genMd5Hash(detail.filePath)
@@ -2079,14 +2080,14 @@ class ExtensionManager {
             path: detail.filePath,
             error: getErrorMessageOrDefault(err),
           });
-          return PromiseBB.resolve();
+          return Promise.resolve();
         });
     } else {
-      promise = PromiseBB.resolve();
+      promise = Promise.resolve();
     }
     // lookup id may be updated now
     if (this.mModDBCache[lookupId] !== undefined && ignoreCache !== true) {
-      return PromiseBB.resolve(this.mModDBCache[lookupId]);
+      return Promise.resolve(this.mModDBCache[lookupId]);
     }
     return promise
       .then(() => this.getModDB())
@@ -2098,7 +2099,7 @@ class ExtensionManager {
       .then((result: ILookupResult[]) => {
         const resultSorter = this.makeSorter(detail);
         this.mModDBCache[lookupId] = result.sort(resultSorter);
-        return PromiseBB.resolve(this.mModDBCache[lookupId]);
+        return Promise.resolve(this.mModDBCache[lookupId]);
       });
   };
 
@@ -2150,7 +2151,7 @@ class ExtensionManager {
     };
   }
 
-  private saveModMeta = (modInfo: IModInfo): PromiseBB<void> => {
+  private saveModMeta = (modInfo: IModInfo): Promise<void> => {
     const lookupId = this.modLookupId({
       fileMD5: modInfo.fileMD5,
       filePath: modInfo.fileName,
@@ -2159,7 +2160,7 @@ class ExtensionManager {
     });
     delete this.mModDBCache[lookupId];
     return this.getModDB().then((modDB) => {
-      return new PromiseBB<void>((resolve, reject) => {
+      return new Promise<void>((resolve, reject) => {
         modDB.insert([modInfo]);
         resolve();
       });
@@ -2169,7 +2170,7 @@ class ExtensionManager {
   private genMd5Hash = (
     data: string | Buffer,
     progressFunc?: (progress: number, total: number) => void,
-  ): PromiseBB<IHashResult> => {
+  ): Promise<IHashResult> => {
     let lastProgress: number = 0;
     const progressHash = progressFunc
       ? (progress: number, total: number) => {
@@ -2178,12 +2179,12 @@ class ExtensionManager {
         }
       : undefined;
 
-    return PromiseBB.resolve(fileMD5(data, progressHash)).then((md5sum) => {
+    return Promise.resolve(fileMD5(data, progressHash)).then((md5sum) => {
       if (lastProgress > 0) {
         return { md5sum, numBytes: lastProgress };
       }
       const sizePromise = Buffer.isBuffer(data)
-        ? PromiseBB.resolve(data.length)
+        ? Promise.resolve(data.length)
         : fsVortex
             .statAsync(data)
             .then((stats) => stats.size)
@@ -2197,7 +2198,7 @@ class ExtensionManager {
     archivePath: string,
     options?: IArchiveOptions,
     ext?: string,
-  ): PromiseBB<Archive> => {
+  ): Promise<Archive> => {
     if (this.mArchiveHandlers === undefined) {
       // lazy loading the archive handlers
       this.mArchiveHandlers = {};
@@ -2208,29 +2209,33 @@ class ExtensionManager {
     }
     const creator = this.mArchiveHandlers[ext];
     if (creator === undefined) {
-      return PromiseBB.reject(new NotSupportedError());
+      return Promise.reject(new NotSupportedError());
     }
     return creator(archivePath, options || {}).then((handler: IArchiveHandler) =>
-      PromiseBB.resolve(new Archive(handler)),
+      Promise.resolve(new Archive(handler)),
     );
   };
 
-  private applyStartHooks(input: IRunParameters): PromiseBB<IRunParameters> {
+  private applyStartHooks(input: IRunParameters): Promise<IRunParameters> {
     let updated = input;
-    return PromiseBB.each(this.mStartHooks, (hook) =>
+    return each(this.mStartHooks, (hook) =>
       hook
         .hook(updated)
         .then((newParameters: IRunParameters) => {
           updated = newParameters;
         })
-        .catch(UserCanceled, (err) => {
-          log("debug", "start canceled by user");
-          return PromiseBB.reject(err);
-        })
-        .catch(ProcessCanceled, (err) => {
-          log("debug", "hook canceled start", getErrorMessageOrDefault(err));
-          return PromiseBB.reject(err);
-        })
+        .catch(
+          only(UserCanceled, (err) => {
+            log("debug", "start canceled by user");
+            return Promise.reject(err);
+          }),
+        )
+        .catch(
+          only(ProcessCanceled, (err) => {
+            log("debug", "hook canceled start", getErrorMessageOrDefault(err));
+            return Promise.reject(err);
+          }),
+        )
         .catch((err) => {
           if (err instanceof UserCanceled) {
             log("debug", "start canceled by user");
@@ -2239,7 +2244,7 @@ class ExtensionManager {
           } else {
             log("error", "hook failed", err);
           }
-          return PromiseBB.reject(err);
+          return Promise.reject(err);
         }),
     ).then(() => updated);
   }
@@ -2248,9 +2253,9 @@ class ExtensionManager {
     executable: string,
     args: string[],
     options: IRunOptions,
-  ): PromiseBB<void> => {
+  ): Promise<void> => {
     if (!truthy(executable)) {
-      return PromiseBB.reject(new ProcessCanceled("Executable not set"));
+      return Promise.reject(new ProcessCanceled("Executable not set"));
     }
     const interpreter = this.mInterpreters[path.extname(executable).toLowerCase()];
     if (interpreter !== undefined) {
@@ -2261,7 +2266,7 @@ class ExtensionManager {
           options,
         }));
       } catch (err) {
-        return PromiseBB.reject(err);
+        return Promise.reject(err);
       }
     }
 
@@ -2298,11 +2303,11 @@ class ExtensionManager {
       this.applyStartHooks({ executable, args, options })
         .then((updatedParameters) => {
           ({ executable, args, options } = updatedParameters);
-          return PromiseBB.resolve();
+          return Promise.resolve();
         })
         .then(
           () =>
-            new PromiseBB<void>((resolve, reject) => {
+            new Promise<void>((resolve, reject) => {
               const runExe = options.shell ? `"${executable}"` : executable;
               const spawnOptions: SpawnOptions = {
                 cwd,
@@ -2461,18 +2466,20 @@ class ExtensionManager {
               }
             }),
         )
-        .catch(ProcessCanceled, () => null)
-        .catch({ code: "EACCES" }, (err) => {
-          // Elevated execution is only supported on Windows
-          if (process.platform !== "win32") {
-            return PromiseBB.reject(err);
-          }
-          return this.runElevated(executable, cwd, args, env, options.onSpawned);
-        })
-        .catch({ code: "ECANCELED" }, () => PromiseBB.reject(new UserCanceled()))
-        .catch({ systemCode: 1223 }, () => PromiseBB.reject(new UserCanceled()))
+        .catch(only(ProcessCanceled, () => null))
+        .catch(
+          only({ code: "EACCES" }, (err) => {
+            // Elevated execution is only supported on Windows
+            if (process.platform !== "win32") {
+              return Promise.reject(err);
+            }
+            return this.runElevated(executable, cwd, args, env, options.onSpawned);
+          }),
+        )
+        .catch(only({ code: "ECANCELED" }, () => Promise.reject(new UserCanceled())))
+        .catch(only({ systemCode: 1223 }, () => Promise.reject(new UserCanceled())))
         // Is errno still used ? looks like shellEx call returns systemCode instead
-        .catch({ errno: 1223 }, () => PromiseBB.reject(new UserCanceled()))
+        .catch(only({ errno: 1223 }, () => Promise.reject(new UserCanceled())))
         .catch((unknownErr) => {
           const err = unknownToError(unknownErr);
           if (err.message.toLowerCase().indexOf("the operation was canceled by the user") !== -1) {
@@ -2480,9 +2487,9 @@ class ExtensionManager {
             //  contained none of the properties we rely on to detect when a user
             //  cancels the UAC dialog.
             //  https://github.com/Nexus-Mods/Vortex/issues/8524
-            return PromiseBB.reject(new UserCanceled());
+            return Promise.reject(new UserCanceled());
           }
-          return PromiseBB.reject(err);
+          return Promise.reject(err);
         })
     );
   };
@@ -2496,7 +2503,7 @@ class ExtensionManager {
   ) {
     const ipcPath = shortid();
     let tmpFilePath: string;
-    return new PromiseBB((resolve, reject) => {
+    return new Promise<void>((resolve, reject) => {
       this.startIPC(ipcPath, (err) => {
         if (err !== null) {
           reject(err);
@@ -2530,10 +2537,10 @@ class ExtensionManager {
     });
   }
 
-  private emitAndAwait = (event: string, ...args: any[]): PromiseBB<any> => {
-    let queue = PromiseBB.resolve();
+  private emitAndAwait = (event: string, ...args: any[]): Promise<any> => {
+    let queue = Promise.resolve();
     const results: any[] = [];
-    const enqueue = (prom: PromiseBB<any>) => {
+    const enqueue = (prom: Promise<any>) => {
       if (prom !== undefined) {
         queue = queue.then(() =>
           prom
@@ -2581,7 +2588,7 @@ class ExtensionManager {
     });
   };
 
-  private withPrePost = <T>(eventName: string, cb: (...args: any[]) => PromiseBB<T>) => {
+  private withPrePost = <T>(eventName: string, cb: (...args: any[]) => Promise<T>) => {
     return (...args: any[]) => {
       return this.emitAndAwait(`will-${eventName}`, ...args)
         .then(() => cb(...args))

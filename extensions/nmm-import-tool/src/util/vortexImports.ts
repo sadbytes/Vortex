@@ -1,10 +1,9 @@
 import { actions, types, util } from "@nexusmods/vortex-api";
-import Promise from "bluebird";
 
 import { IModEntry } from "../types/nmmEntries";
 
 export function addMetaData(gameID: string, modEntries: IModEntry[], api: types.IExtensionApi) {
-  Promise.map(modEntries, (modEntry) => {
+  util.map(modEntries, (modEntry) => {
     if (!!modEntry.categoryId) {
       api.store.dispatch(
         actions.setDownloadModInfo(modEntry.archiveId, "custom.category", modEntry.categoryId),

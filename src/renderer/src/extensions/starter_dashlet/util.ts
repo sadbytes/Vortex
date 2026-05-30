@@ -1,6 +1,5 @@
 import path from "path";
 
-import PromiseBB from "bluebird";
 import { nativeImage } from "electron";
 import _ from "lodash";
 
@@ -129,7 +128,7 @@ export function toToolDiscovery(tool: IEditStarterInfo): IDiscoveredTool {
   };
 }
 
-function toPNG(inputPath: string, outputPath: string): PromiseBB<void> {
+function toPNG(inputPath: string, outputPath: string): Promise<void> {
   return fs.writeFileAsync(outputPath, nativeImage.createFromPath(inputPath).toPNG());
 }
 
@@ -142,20 +141,20 @@ export function updateImage(tool: IStarterInfo, filePath: string, cb: (err?: Err
   updateImageDebouncer.schedule(cb, tool, filePath);
 }
 
-function useImage(tool: IStarterInfo, filePath: string): PromiseBB<void> {
+function useImage(tool: IStarterInfo, filePath: string): Promise<void> {
   const destPath = tool.iconOutPath;
 
   if (destPath === filePath) {
-    return PromiseBB.resolve();
+    return Promise.resolve();
   }
 
   return fs
     .statAsync(filePath)
-    .catch((err) => PromiseBB.reject(new ProcessCanceled("invalid file")))
+    .catch((err) => Promise.reject(new ProcessCanceled("invalid file")))
     .then((stats) =>
       stats.isDirectory()
-        ? PromiseBB.reject(new ProcessCanceled("is a directory"))
-        : PromiseBB.resolve(),
+        ? Promise.reject(new ProcessCanceled("is a directory"))
+        : Promise.resolve(),
     )
     .then(() => fs.ensureDirAsync(path.dirname(destPath)))
     .then(() =>

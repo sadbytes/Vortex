@@ -11,7 +11,6 @@ import {
   selectors,
   util,
 } from "@nexusmods/vortex-api";
-import Bluebird from "bluebird";
 import * as React from "react";
 import * as BS from "react-bootstrap";
 import { connect } from "react-redux";
@@ -90,7 +89,7 @@ function prepareForModding(context, discovery) {
   const state = context.api.store.getState();
   const profile = selectors.activeProfile(state);
   return fs
-    .ensureDirWritableAsync(path.join(discovery.path, "Mods"), () => Bluebird.resolve())
+    .ensureDirWritableAsync(path.join(discovery.path, "Mods"), () => Promise.resolve())
     .then(() => getCurrentOrder(path.join(discovery.path, modsPath(), MODS_ORDER_FILENAME)))
     .catch((err) => (err.code === "ENOENT" ? Promise.resolve([]) : Promise.reject(err)))
     .then((data) =>
@@ -107,7 +106,7 @@ function walkAsync(dir) {
   return fs
     .readdirAsync(dir)
     .then((files) => {
-      return Bluebird.each(files, (file) => {
+      return util.each(files, (file) => {
         const fullPath = path.join(dir, file);
         return fs.statAsync(fullPath).then((stats) => {
           if (stats.isDirectory()) {
@@ -138,7 +137,7 @@ function readModsFolder(modsFolder, api) {
   return fs
     .readdirAsync(modsFolder)
     .then((entries) =>
-      Bluebird.reduce(
+      util.reduce(
         entries,
         (accum, current) => {
           const currentPath = path.join(modsFolder, current);
@@ -204,37 +203,39 @@ function refreshModList(context, discoveryPath) {
   const disabled = modKeys.filter((dis) => !enabled.includes(dis));
 
   const extL = (input) => path.extname(input).toLowerCase();
-  return Bluebird.reduce(
-    enabled,
-    (accum, mod) => {
-      if (mods[mod]?.installationPath === undefined) {
-        return accum;
-      }
-      const modPath = path.join(installationPath, mods[mod].installationPath);
-      return walkAsync(modPath).then((entries) =>
-        entries.find((fileName) => [".pak", ".cfg", ".manifest"].includes(extL(fileName))) !==
-        undefined
-          ? accum.concat(mod)
-          : accum,
-      );
-    },
-    [],
-  ).then((managedMods) => {
-    return getManuallyAddedMods(
-      disabled,
+  return util
+    .reduce(
       enabled,
-      path.join(discoveryPath, modsPath(), MODS_ORDER_FILENAME),
-      context.api,
-    ).then((manuallyAdded) => {
-      _MODS_STATE.enabled = [].concat(
-        managedMods.map((mod) => transformId(mod)),
-        manuallyAdded,
-      );
-      _MODS_STATE.disabled = disabled;
-      _MODS_STATE.display = _MODS_STATE.enabled;
-      return Promise.resolve();
+      (accum, mod) => {
+        if (mods[mod]?.installationPath === undefined) {
+          return accum;
+        }
+        const modPath = path.join(installationPath, mods[mod].installationPath);
+        return walkAsync(modPath).then((entries) =>
+          entries.find((fileName) => [".pak", ".cfg", ".manifest"].includes(extL(fileName))) !==
+          undefined
+            ? accum.concat(mod)
+            : accum,
+        );
+      },
+      [],
+    )
+    .then((managedMods) => {
+      return getManuallyAddedMods(
+        disabled,
+        enabled,
+        path.join(discoveryPath, modsPath(), MODS_ORDER_FILENAME),
+        context.api,
+      ).then((manuallyAdded) => {
+        _MODS_STATE.enabled = [].concat(
+          managedMods.map((mod) => transformId(mod)),
+          manuallyAdded,
+        );
+        _MODS_STATE.disabled = disabled;
+        _MODS_STATE.display = _MODS_STATE.enabled;
+        return Promise.resolve();
+      });
     });
-  });
 }
 
 function LoadOrderBase(props) {

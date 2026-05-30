@@ -135,6 +135,8 @@ import {
 } from "../extensions/analytics/mixpanel/MixpanelEvents";
 import getTextModManagement from "../extensions/mod_management/texts";
 import getTextProfileManagement from "../extensions/profile_management/texts";
+import { each, filter, map, mapSeries, only, reduce, reflect } from "./asyncpromise";
+import type { AsyncMapper, Inspection, IMapOptions } from "./asyncpromise";
 import deepMerge from "./deepMerge";
 import { runElevated } from "./elevated";
 import { runThreaded } from "./thread";
@@ -303,7 +305,15 @@ export {
   CollectionsDraftedEvent,
   CollectionsDraftUploadedEvent,
   CollectionsDraftUpdateUploadedEvent,
+  each,
+  filter,
+  map,
+  mapSeries,
+  only,
+  reduce,
+  reflect,
 };
+export type { AsyncMapper, Inspection, IMapOptions };
 
 // getText functions are rolled up into one function
 export type TextGroup = "mod" | "profile";

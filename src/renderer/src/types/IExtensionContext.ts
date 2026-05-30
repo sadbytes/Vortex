@@ -1,4 +1,3 @@
-import type PromiseBB from "bluebird";
 import type { IHashResult, IServer } from "modmeta-db";
 import type { ILookupResult, IModInfo, IQuery, IReference } from "modmeta-db";
 import type * as React from "react";
@@ -241,7 +240,7 @@ export interface IRegisterRepositoryLookup {
   (
     repositoryId: string,
     preferOverMD5: boolean,
-    callback: (id: IModRepoId) => PromiseBB<IModLookupResult[]>,
+    callback: (id: IModRepoId) => Promise<IModLookupResult[]>,
   );
 }
 
@@ -306,19 +305,19 @@ export interface IArchiveOptions {
  * @interface IArchiveHandler
  */
 export interface IArchiveHandler {
-  readDir(archPath: string): PromiseBB<string[]>;
+  readDir(archPath: string): Promise<string[]>;
   readFile?(filePath: string): NodeJS.ReadableStream;
-  extractFile?(filePath: string, outputPath: string): PromiseBB<void>;
-  extractAll(outputPath: string): PromiseBB<void>;
-  addFile?(filePath: string, sourcePath: string): PromiseBB<void>;
-  create?(sourcePath: string): PromiseBB<void>;
-  write?(): PromiseBB<void>;
+  extractFile?(filePath: string, outputPath: string): Promise<void>;
+  extractAll(outputPath: string): Promise<void>;
+  addFile?(filePath: string, sourcePath: string): Promise<void>;
+  create?(sourcePath: string): Promise<void>;
+  write?(): Promise<void>;
 }
 
 export type ArchiveHandlerCreator = (
   fileName: string,
   options: IArchiveOptions,
-) => PromiseBB<IArchiveHandler>;
+) => Promise<IArchiveHandler>;
 
 /**
  * callback used to extract download information into mod info.
@@ -446,8 +445,8 @@ export interface IApiFuncOptions {
 
 export interface IExtensionApiExtension
   extends INexusAPIExtension, IModsAPIExtension, IDownloadsAPIExtension {
-  ensureLoggedIn?: () => PromiseBB<void>;
-  awaitProfileSwitch?: () => PromiseBB<string>;
+  ensureLoggedIn?: () => Promise<void>;
+  awaitProfileSwitch?: () => Promise<string>;
   showOverlay?: (
     id: string,
     title: string,
@@ -507,7 +506,7 @@ export interface IExtensionApi {
     content: IDialogContent,
     actions: DialogActions,
     id?: string,
-  ) => PromiseBB<IDialogResult>;
+  ) => Promise<IDialogResult>;
 
   /**
    * close a dialog
@@ -538,28 +537,28 @@ export interface IExtensionApi {
    *
    * @memberOf IExtensionApi
    */
-  selectFile: (options: IOpenOptions) => PromiseBB<string>;
+  selectFile: (options: IOpenOptions) => Promise<string>;
 
   /**
    * show a system dialog to save a single file
    *
    * @memberOf IExtensionApi
    */
-  saveFile: (options: ISaveOptions) => PromiseBB<string>;
+  saveFile: (options: ISaveOptions) => Promise<string>;
 
   /**
    * show a system dialog to select an executable file
    *
    * @memberOf IExtensionApi
    */
-  selectExecutable: (options: IOpenOptions) => PromiseBB<string>;
+  selectExecutable: (options: IOpenOptions) => Promise<string>;
 
   /**
    * show a system dialog to open a single directory
    *
    * @memberOf IExtensionApi
    */
-  selectDir: (options: IOpenOptions) => PromiseBB<string>;
+  selectDir: (options: IOpenOptions) => Promise<string>;
 
   /**
    * the redux store containing all application state & data
@@ -667,10 +666,7 @@ export interface IExtensionApi {
    *
    * @memberOf IExtensionApi
    */
-  lookupModReference: (
-    ref: IModReference,
-    options?: ILookupOptions,
-  ) => PromiseBB<IModLookupResult[]>;
+  lookupModReference: (ref: IModReference, options?: ILookupOptions) => Promise<IModLookupResult[]>;
 
   /**
    * add a meta server
@@ -688,7 +684,7 @@ export interface IExtensionApi {
   genMd5Hash: (
     data: string | Buffer,
     progressFunc?: (progress: number, total: number) => void,
-  ) => PromiseBB<IHashResult>;
+  ) => Promise<IHashResult>;
 
   /**
    * find meta information about a mod
@@ -700,14 +696,14 @@ export interface IExtensionApi {
    *
    * @memberOf IExtensionApi
    */
-  lookupModMeta: (details: ILookupDetails, ignoreCache?: boolean) => PromiseBB<ILookupResult[]>;
+  lookupModMeta: (details: ILookupDetails, ignoreCache?: boolean) => Promise<ILookupResult[]>;
 
   /**
    * save meta information about a mod
    *
    * @memberOf IExtensionApi
    */
-  saveModMeta: (modInfo: IModInfo) => PromiseBB<void>;
+  saveModMeta: (modInfo: IModInfo) => Promise<void>;
 
   /**
    * opens an archive
@@ -716,7 +712,7 @@ export interface IExtensionApi {
     archivePath: string,
     options?: IArchiveOptions,
     extension?: string,
-  ) => PromiseBB<Archive>;
+  ) => Promise<Archive>;
 
   /**
    * clear the stylesheet cache to ensure it gets rebuilt even if the list of files hasn't changed
@@ -757,14 +753,14 @@ export interface IExtensionApi {
    * The returned promise is resolved when the started process has run to completion.
    * IRunOptions.onSpawned can be used to react to when the process has been started.
    */
-  runExecutable: (executable: string, args: string[], options: IRunOptions) => PromiseBB<void>;
+  runExecutable: (executable: string, args: string[], options: IRunOptions) => Promise<void>;
 
   /**
    * emit an event and allow every receiver to return a Promise. This call will only return
    * after all these Promises are resolved.
    * If the event handlers return a value, this returns an array of results
    */
-  emitAndAwait: <T = any>(eventName: string, ...args: any[]) => PromiseBB<T>;
+  emitAndAwait: <T = any>(eventName: string, ...args: any[]) => Promise<T>;
 
   /**
    * handle an event emitted with emitAndAwait. The listener can return a promise and the emitter
@@ -784,8 +780,8 @@ export interface IExtensionApi {
    */
   withPrePost: <T>(
     eventName: string,
-    callback: (...args: any[]) => PromiseBB<T>,
-  ) => (...args: any[]) => PromiseBB<T>;
+    callback: (...args: any[]) => Promise<T>,
+  ) => (...args: any[]) => Promise<T>;
 
   /**
    * returns true if the running version of Vortex is considered outdated. This is mostly used
@@ -817,7 +813,7 @@ export interface IExtensionApi {
    * displayed but may require the UI to be processed.
    * Specifically events can only be sent once this event has been triggered
    */
-  awaitUI: () => PromiseBB<void>;
+  awaitUI: () => Promise<void>;
 
   /**
    * wrapper for api.store.getState() with the benefit that it automatically assigns a type
@@ -1271,7 +1267,7 @@ export interface IExtensionContext {
    *                                          game
    * @param {(game: IGame) => string} getPath given the specified game, return the absolute path to
    *                                          where games of this type should be installed.
-   * @param {(instructions) => PromiseBB<boolean>} test given the list of install instructions,
+   * @param {(instructions) => Promise<boolean>} test given the list of install instructions,
    *                                                  determine if the installed mod is of this type
    * @param {IModTypeOptions} options options controlling the mod type
    */
@@ -1280,7 +1276,7 @@ export interface IExtensionContext {
     priority: number,
     isSupported: (gameId: string) => boolean,
     getPath: (game: IGame) => string,
-    test: (installInstructions: IInstruction[]) => PromiseBB<boolean>,
+    test: (installInstructions: IInstruction[]) => Promise<boolean>,
     options?: IModTypeOptions,
   ) => void;
 
@@ -1389,7 +1385,7 @@ export interface IExtensionContext {
    *                           As soon as the promise returned from this is resolved, the stored
    *                           version number is updated.
    */
-  registerMigration: (migrate: (oldVersion: string) => PromiseBB<void>) => void;
+  registerMigration: (migrate: (oldVersion: string) => Promise<void>) => void;
 
   /**
    * register a file to be stored with the profile. It will always be synchronised with the current
@@ -1454,7 +1450,7 @@ export interface IExtensionContext {
    */
   registerPreview?: (
     priority: number,
-    handler: (files: IPreviewFile[], allowPick: boolean) => PromiseBB<IPreviewFile>,
+    handler: (files: IPreviewFile[], allowPick: boolean) => Promise<IPreviewFile>,
   ) => void;
 
   /**
